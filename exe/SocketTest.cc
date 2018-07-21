@@ -47,8 +47,8 @@ int SocketTest (std::string const& IPADDRESS, int const PORT)
 
   // Send an HTML GET and read response
   //sprintf(buffer, "GET / HTTP/1.1\r\n\r\n");
-  char* message = "GET / HTTP/1.1\r\nHOST: localhost\r\nUser-Agent: none\r\n\r\n";
-  send(client, message, strlen(message), 0);
+  std::string message = "GET / HTTP/1.1\r\nHOST: localhost\r\nUser-Agent: none\r\n\r\n";
+  send(client, message.c_str(), message.size(), 0);
   recv(client, buffer, bufsize, 0);
   std::cout << buffer << std::endl;;
 

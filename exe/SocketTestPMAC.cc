@@ -16,7 +16,47 @@
 #include <unistd.h>
 #include <netdb.h>
 
-int SocketTest (std::string const& IPADDRESS, int const PORT)
+
+
+
+// Ethernet command structure.  The pragma is to foce the compiler to
+// pack bytes without bufferring
+#pragma pack(1)
+typedef struct tagEthernetCmd
+{
+    unsigned char RequestType;
+    unsigned char Request;
+    unsigned short wValue;
+    unsigned short wIndex;
+    unsigned short wLength; /* length of bData */
+    unsigned char bData[1492];
+} ETHERNETCMD,*PETHERNETCMD;
+#pragma pack()
+
+
+
+#define VR_PMAC_SENDLINE      0xB0
+#define VR_PMAC_GETLINE       0xB1
+#define VR_PMAC_FLUSH         0xB3
+#define VR_PMAC_GETMEM        0xB4
+#define VR_PMAC_SETMEM        0xB5
+#define VR_PMAC_SETBIT        0xBA
+#define VR_PMAC_SETBITS       0xBB
+#define VR_PMAC_PORT          0xBE
+#define VR_PMAC_GETRESPONSE   0xBF
+#define VR_PMAC_READREADY     0xC2
+#define VR_CTRL_RESPONSE      0xC4
+#define VR_PMAC_GETBUFFER     0xC5
+#define VR_PMAC_WRITEBUFFER   0xC6
+#define VR_PMAC_WRITEERROR    0xC7
+#define VR_FWDOWNLOAD         0xCB
+#define VR_IPADDRESS          0xE0
+
+
+
+
+
+int SocketTestPMAC (std::string const& IPADDRESS, int const PORT = 1025)
 {
 
   int bufsize = 1024*1024;
@@ -46,9 +86,8 @@ int SocketTest (std::string const& IPADDRESS, int const PORT)
   }
 
   // Send an HTML GET and read response
-  //sprintf(buffer, "GET / HTTP/1.1\r\n\r\n");
-  char* message = "GET / HTTP/1.1\r\nHOST: localhost\r\nUser-Agent: none\r\n\r\n";
-  send(client, message, strlen(message), 0);
+  std::string message = "GET / HTTP/1.1\r\nHOST: localhost\r\nUser-Agent: none\r\n\r\n";
+  send(client, message.c_str(), message.size(), 0);
   recv(client, buffer, bufsize, 0);
   std::cout << buffer << std::endl;;
 
@@ -65,7 +104,7 @@ int main (int argc, char* argv[])
     return 1;
   }
 
-  SocketTest(argv[1], atoi(argv[2]));
+  SocketTestPMAC(argv[1], atoi(argv[2]));
 
   return 0;
 }
