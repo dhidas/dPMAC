@@ -90,7 +90,7 @@ class PMAC2Turbo
   private:
     int fSocket;
     ETHERNETCMD fEthCmd;
-    char fData[1401];
+    unsigned char fData[1401];
     std::string fDataSend;
 
 

@@ -258,9 +258,9 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
     strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
-    uint8_t check =  fData[3];
-    std::cout << (int) check << std::endl;
-    if ((uint8_t) fData[3] == 0x80) {
+    int check =  fData[3];
+    std::cout << check << std::endl;
+    if (fData[3] == 0x80) {
       std::cout << "HELLO ERROR" << std::endl;
     }
     PrintBits(fData[0]);
