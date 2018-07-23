@@ -23,10 +23,16 @@
 #include <unistd.h>
 //#include <netdb.h>
 //#include <cstdlib>
+#include <bitset>
 
 #include <readline/readline.h>
 #include <readline/history.h>
 
+void PrintBits (char c)
+{
+  std::cout << std::bitset<8>(c).to_ulong() << std::endl;
+  return;
+}
 
 PMAC2Turbo::PMAC2Turbo ()
 {
@@ -103,7 +109,10 @@ void PMAC2Turbo::Terminal ()
 {
   // Simple terminal for PMAC2 using the readline library
 
+  this->Flush();
+
   rl_bind_key (CTRLK, rl_insert);
+  //rl_bind_key (CTRLK, static_cast<PMAC2Turbo*>(this)->SendCTRLK);
   rl_bind_key (CTRLD, rl_insert);
   char* buf;
   while ((buf = readline(">> ")) != nullptr) {
@@ -148,6 +157,64 @@ void PMAC2Turbo::Flush ()
 
 
 
+
+void PMAC2Turbo::IPAddress (std::string const& IP)
+{
+  // Get or set the IP address
+
+  if (IP == "") {
+    fEthCmd.RequestType = VR_UPLOAD;
+  } else {
+    fEthCmd.RequestType = VR_DOWNLOAD;
+  }
+  fEthCmd.Request     = VR_IPADDRESS;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(4);
+  //strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
+  //send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  recv(fSocket, (char*) &fData, 4, 0);
+
+  if (IP == "") {
+    std::cout << std::bitset<8>(fData[0]).to_ulong() << "."
+              << std::bitset<8>(fData[1]).to_ulong() << "."
+              << std::bitset<8>(fData[2]).to_ulong() << "."
+              << std::bitset<8>(fData[3]).to_ulong() << std::endl;
+  }
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::SendCTRLK ()
+{
+
+  //fEthCmd.RequestType = VR_DOWNLOAD;
+  //fEthCmd.Request     = VR_PMAC_SENDCTRLCHAR;
+  //fEthCmd.wValue      = htons(CTRLK);
+  //fEthCmd.wIndex      = 0;
+  //fEthCmd.wLength     = 0;
+  //send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+
+  fEthCmd.RequestType = VR_UPLOAD;
+  fEthCmd.Request     = VR_CTRL_RESPONSE;
+  fEthCmd.wValue      = htons(CTRLK);
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(1);
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  recv(fSocket, fData, 1, 0);
+
+  std::cout << "data back: " << fData << std::endl;
+  return;
+}
+
+
+
+
+
 void PMAC2Turbo::SendLine (std::string const& Line)
 {
   // Send a command line to PMAC
@@ -160,6 +227,40 @@ void PMAC2Turbo::SendLine (std::string const& Line)
   strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
   send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
   recv(fSocket, (char*) &fData, 1, 0);
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
+{
+  // Send a command line to PMAC
+ 
+  std::ifstream fi(Buffer);
+  if (!fi.is_open()) {
+    std::cerr << "ERROR: cannot open file: " << Buffer << std::endl;
+    return;
+  }
+
+  for (std::string Line; std::getline(fi, Line); ) {
+
+    std::cout << Line << std::endl;
+
+    fEthCmd.RequestType = VR_DOWNLOAD;
+    fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
+    fEthCmd.wValue      = 0;
+    fEthCmd.wIndex      = 0;
+    fEthCmd.wLength     = htons(Line.size());
+    strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+    recv(fSocket, (char*) &fData, 4, 0);
+    PrintBits(fData[0]);
+    PrintBits(fData[1]);
+    PrintBits(fData[2]);
+    PrintBits(fData[3]);
+  }
 
   return;
 }

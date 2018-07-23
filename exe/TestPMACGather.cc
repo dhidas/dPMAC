@@ -19,6 +19,8 @@ int TestPMACGather ()
   PMAC2Turbo PMAC(IP);
 
   //PMAC.ListGather("data.dat");
+  PMAC.IPAddress();
+  PMAC.WriteBuffer("test.pmc");
   PMAC.Terminal();
 
   return 0;

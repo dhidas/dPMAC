@@ -79,7 +79,10 @@ class PMAC2Turbo
     void Terminal ();
 
     void Flush ();
+    void IPAddress (std::string const& IP = "");
+    void SendCTRLK ();
     void SendLine (std::string const& Line);
+    void WriteBuffer (std::string const& Buffer);
     void GetBuffer (std::string const& OutFileName = "");
     void ListGather (std::string const& OutFileName = "");
 
