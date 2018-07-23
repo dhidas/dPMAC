@@ -12,10 +12,26 @@
 #include "PMAC2Turbo.h"
 
 #include <iostream>
+#include <fstream>
+#include <exception>
+#include <string.h>
+//#include <sys/types.h>
+#include <sys/socket.h>
+//#include <netinet/in.h>
+#include <arpa/inet.h>
+//#include <stdlib.h>
+#include <unistd.h>
+//#include <netdb.h>
+//#include <cstdlib>
+
+#include <readline/readline.h>
+#include <readline/history.h>
+
 
 PMAC2Turbo::PMAC2Turbo ()
 {
   // Default constructor
+  fSocket = -1;
 }
 
 
@@ -27,9 +43,9 @@ PMAC2Turbo::PMAC2Turbo (std::string const& IP, int const PORT)
   //  IP - IP address as a string, e.g. "192.168.1.103"
   //  PORT - The port number to connect to as an int.  Typically 1025
 
-  //this->SetIPPort(IP, PORT)
+  fSocket = -1;
 
-  int sock = socket(PF_INET, SOCK_STREAM, 0);
+  this->Connect(IP, PORT);
 }
 
 
@@ -37,6 +53,214 @@ PMAC2Turbo::PMAC2Turbo (std::string const& IP, int const PORT)
 PMAC2Turbo::~PMAC2Turbo ()
 {
   // Destruction
+  this->Disconnect();
 }
 
 
+
+void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
+{
+  // Create and connect the socket
+  fSocket = socket(PF_INET, SOCK_STREAM, 0);
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Cannot create socket" << std::endl;
+  }
+
+  // Server socket address struct
+  struct sockaddr_in server_addr;
+
+  // Set server IP and port information
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = inet_addr(IP.c_str());
+  server_addr.sin_port = htons(PORT);
+
+  // Connect socket or return an error
+  if (connect(fSocket,(struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
+  } else {
+    std::cerr << "Error when connecting to server " << IP << " on port " << PORT << std::endl;
+    return;
+  }
+
+  return;
+}
+
+
+
+void PMAC2Turbo::Disconnect ()
+{
+  // Disconnect the socket if it looks like it exists
+  if (fSocket >= 0) {
+    close(fSocket);
+  }
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::Terminal ()
+{
+  // Simple terminal for PMAC2 using the readline library
+
+  rl_bind_key (CTRLK, rl_insert);
+  rl_bind_key (CTRLD, rl_insert);
+  char* buf;
+  while ((buf = readline(">> ")) != nullptr) {
+    if (strlen(buf) > 0) {
+      add_history(buf);
+    }
+
+    this->SendLine(buf);
+    this->GetBuffer();
+
+    // readline malloc's a new buffer every time.
+    free(buf);
+  }
+
+
+  return;
+}
+
+
+
+
+
+void PMAC2Turbo::Flush ()
+{
+  // Flush the data buffer in PMAC
+
+  // First flush any data in the buffer
+  fEthCmd.RequestType = VR_DOWNLOAD;
+  fEthCmd.Request     = VR_PMAC_FLUSH;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = 0;
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  recv(fSocket, (char*) &fData, 1, 0);
+  if (fData[0] != VR_DOWNLOAD) {
+    std::cerr << "ERROR: flush failed" << std::endl;
+  }
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::SendLine (std::string const& Line)
+{
+  // Send a command line to PMAC
+  
+  fEthCmd.RequestType = VR_DOWNLOAD;
+  fEthCmd.Request     = VR_PMAC_SENDLINE;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(Line.size());
+  strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+  recv(fSocket, (char*) &fData, 1, 0);
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::GetBuffer (std::string const& OutFileName)
+{
+  // File for writing if name given
+  std::ofstream of;
+  if (OutFileName != "") {
+    of.open(OutFileName.c_str());
+    if (!of.is_open()) {
+      std::cerr << "ERROR: cannot open OutFileName: " << OutFileName << std::endl;
+    }
+  }
+
+  // Write to file or std::cout
+  std::ostream* out = of.is_open() ? &of : &std::cout ;
+
+  // For the output commands
+  fEthCmd.RequestType = VR_UPLOAD;
+  fEthCmd.Request     = VR_PMAC_READREADY;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(2);
+
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  recv(fSocket, fData, 2, 0);
+
+  //int call = 0;
+  while (fData[0] == 1) {
+
+    fEthCmd.RequestType = VR_UPLOAD;
+    fEthCmd.Request     = VR_PMAC_GETBUFFER;
+    fEthCmd.wValue      = 0;
+    fEthCmd.wIndex      = 0;
+    fEthCmd.wLength     = 0;
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+    recv(fSocket, (char*) &fData, 1400, 0);
+
+    int cr_at = -1;
+    bool ack_found = false;
+    for (int i = 0; i != 1400; ++i) {
+      if (fData[i] == ACK) {
+        ack_found = true;
+        cr_at = i;
+        break;
+      }
+      if (fData[i] == 0xD) {
+        cr_at = i;
+        if (i < 1400-1 && fData[i+1] == ACK) {
+        }
+        break;
+      }
+    }
+
+    if (cr_at < 0) {
+    } else {
+      for (int j = 0; j < cr_at; ++j) {
+        *out << fData[j];
+      }
+      if (!ack_found) {
+        *out << std::endl;
+      }
+    }
+    if (ack_found) {
+      break;
+    }
+
+    fEthCmd.RequestType = VR_UPLOAD;
+    fEthCmd.Request     = VR_PMAC_READREADY;
+    fEthCmd.wValue      = 0;
+    fEthCmd.wIndex      = 0;
+    fEthCmd.wLength     = htons(2);
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+    recv(fSocket, fData, 2, 0);
+  }
+
+  return;
+}
+
+
+
+
+
+void PMAC2Turbo::ListGather (std::string const& OutFileName)
+{
+  // Check if socket at least defined
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Trying to ListGather but socket not created" << std::endl;
+    return;
+  }
+
+  // First flush any data in the buffer, send the list gather command,
+  // Read the buffer, and flush after
+  this->Flush();
+  this->SendLine("LIST GATHER");
+  this->GetBuffer(OutFileName);
+  this->Flush();
+
+  return;
+}

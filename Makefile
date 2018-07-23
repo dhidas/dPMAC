@@ -1,7 +1,7 @@
 CC = g++
 LD = g++
 CFLAGS = -Wall -O3 -std=c++14
-LIBS = 
+LIBS = -lreadline
 INCLUDE = -Iinclude
 OBJS  = $(patsubst src/%.cc,lib/%.o,$(wildcard src/*.cc))
 EXECS = $(patsubst exe/%.cc,bin/%,$(wildcard exe/*.cc))

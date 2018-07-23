@@ -79,8 +79,6 @@ typedef struct tagEthernetCmd
 int SocketTestPMAC (std::string const& IPADDRESS, int const PORT = 1025)
 {
 
-  int bufsize = 1024*1024;
-  char buffer[bufsize];
 
   // Server socket address struct
   struct sockaddr_in server_addr;
@@ -125,22 +123,7 @@ int SocketTestPMAC (std::string const& IPADDRESS, int const PORT = 1025)
   }
 
 
-
-  EthCmd.RequestType = VR_UPLOAD;
-  EthCmd.Request     = VR_PMAC_READREADY;
-  EthCmd.wValue      = 0;
-  EthCmd.wIndex      = 0;
-  EthCmd.wLength     = htons(2);
-  //char data[2];
-  send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
-  recv(sock, data, 2, 0);
-  if (data[0] == 0) {
-    std::cout << "No data to be read" << std::endl;
-  }
-
-
-
-  char* outstr = "ver";
+  char* outstr = "i1..100";
   EthCmd.RequestType = VR_DOWNLOAD;
   EthCmd.Request     = VR_PMAC_SENDLINE;
   EthCmd.wValue      = 0;
@@ -151,7 +134,8 @@ int SocketTestPMAC (std::string const& IPADDRESS, int const PORT = 1025)
   send(sock, (char*) &EthCmd, ETHERNETCMDSIZE + strlen(outstr), 0);
   recv(sock, (char*) &data, 1, 0);
 
-  std::cout << data[0] << std::endl;
+
+
 
   EthCmd.RequestType = VR_UPLOAD;
   EthCmd.Request     = VR_PMAC_READREADY;
@@ -161,76 +145,67 @@ int SocketTestPMAC (std::string const& IPADDRESS, int const PORT = 1025)
   //char data[2];
   send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
   recv(sock, data, 2, 0);
-  if (data[0] == 0) {
-    std::cout << "No data to be read" << std::endl;
-  } else {
-    std::cout << "data to be read" << std::endl;
-  }
 
+  int call = 0;
+  while (data[0] == 1) {
+    //std::cout << "call " << ++call << std::endl;
 
-  char instr[256];
-  EthCmd.RequestType = VR_DOWNLOAD;
-  EthCmd.Request     = VR_PMAC_GETLINE;
-  EthCmd.wValue      = 0;
-  EthCmd.wIndex      = 0;
-  EthCmd.wLength     = 0;
-  send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
-  recv(sock, (char*) &instr, 255, 0);
-  std::cout << instr << std::endl;
+    EthCmd.RequestType = VR_UPLOAD;
+    EthCmd.Request     = VR_PMAC_GETBUFFER;
+    EthCmd.wValue      = 0;
+    EthCmd.wIndex      = 0;
+    EthCmd.wLength     = 0;
+    send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
+    recv(sock, (char*) &data, 1400, 0);
 
-
-  //char* outstr = "ver";
-  std::string a;
-  while (std::cout << "> " && std::getline (std::cin,a)) {
-    if (a == "x") {
-      break;
+    for (int i = 0; i != 1400; ++i) {
+      if (data[i] == ACK) {
+        //std::cout << "ACK found at i: " << i << std::endl;
+      }
+      if (data[i] == 0xD) {
+        //std::cout << "CR found at i: " << i << std::endl;
+      }
     }
-  EthCmd.RequestType = VR_DOWNLOAD;
-  EthCmd.Request     = VR_PMAC_GETRESPONSE;
-  EthCmd.wValue      = 0;
-  EthCmd.wIndex      = 0;
-  EthCmd.wLength     = htons( a.size());
-  strncpy((char*) &EthCmd.bData[0], a.c_str(),  a.size());
-  send(sock, (char*) &EthCmd, ETHERNETCMDSIZE+ a.size(), 0);
-  recv(sock, (char*) &data, 1400, 0);
+    std::cout << data << std::endl;
 
-  int j = 0;
-  char dataword[4001];
-
-  bool ackfound = false;
-  while (!ackfound) {
-  for (int i = 0; i != 1400; ++i) {
-    if (data[i] == ACK) {
-      ackfound = true;
-      break;
-    }
-    if (data[i] == 0x0d || i == 1400-1) {
-      dataword[j] = '\0';
-      j = 0;
-      std::cout << "data: " << dataword << std::endl;
-    } else if (data[i] != BELL) {
-      dataword[j++] = data[i];
-    } else {
-      std::cout << "ERROR BELL" << std::endl;
-      break;
-    }
+    EthCmd.RequestType = VR_UPLOAD;
+    EthCmd.Request     = VR_PMAC_READREADY;
+    EthCmd.wValue      = 0;
+    EthCmd.wIndex      = 0;
+    EthCmd.wLength     = htons(2);
+    //char data[2];
+    send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
+    recv(sock, data, 2, 0);
   }
 
-  EthCmd.RequestType = VR_UPLOAD;
-  EthCmd.Request     = VR_PMAC_GETBUFFER;
-  EthCmd.wValue      = 0;
-  EthCmd.wIndex      = 0;
-  EthCmd.wLength     = 0;
-  send(sock, (char*) &EthCmd, ETHERNETCMDSIZE, 0);
-  recv(sock, (char*) &data, 1400, 0);
+  std::cout << "done reading data" << std::endl;
 
-  }
 
-  //std::cout << std::hex << (int) data[0] << std::endl;
-  //std::cout << std::hex << (int) data[1] << std::endl;
-  //std::cout << std::hex << (int) data[2] << std::endl;
-  //std::cout << std::hex << (int) data[3] << std::endl;
-  }
+
+
+  //int j = 0;
+  //char dataword[4001];
+
+  //bool ackfound = false;
+  //while (!ackfound) {
+  //for (int i = 0; i != 1400; ++i) {
+  //  if (data[i] == ACK) {
+  //    ackfound = true;
+  //    break;
+  //  }
+  //  if (data[i] == 0x0d || i == 1400-1) {
+  //    dataword[j] = '\0';
+  //    j = 0;
+  //    std::cout << "data: " << dataword << std::endl;
+  //  } else if (data[i] != BELL) {
+  //    dataword[j++] = data[i];
+  //  } else {
+  //    std::cout << "ERROR BELL" << std::endl;
+  //    break;
+  //  }
+  //}
+
+
 
   close(sock);
   return 0;
