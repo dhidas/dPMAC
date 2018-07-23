@@ -30,7 +30,8 @@
 
 void PrintBits (char c)
 {
-  std::cout << std::bitset<8>(c).to_ulong() << std::endl;
+  std::bitset<8> b(c);
+  std::cout << b << " " << b.to_ulong() << std::endl;
   return;
 }
 
@@ -238,6 +239,7 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
 {
   // Send a command line to PMAC
  
+  this->Flush();
   std::ifstream fi(Buffer);
   if (!fi.is_open()) {
     std::cerr << "ERROR: cannot open file: " << Buffer << std::endl;
@@ -256,6 +258,11 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
     strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
+    uint8_t check =  fData[3];
+    std::cout << (int) check << std::endl;
+    if ((uint8_t) fData[3] == 0x80) {
+      std::cout << "HELLO ERROR" << std::endl;
+    }
     PrintBits(fData[0]);
     PrintBits(fData[1]);
     PrintBits(fData[2]);
