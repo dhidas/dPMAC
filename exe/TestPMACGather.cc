@@ -20,7 +20,7 @@ int TestPMACGather ()
 
   //PMAC.ListGather("data.dat");
   PMAC.IPAddress();
-  PMAC.WriteBuffer("test.pmc");
+  PMAC.DownloadFile("test.pmc");
   PMAC.Terminal();
 
   return 0;

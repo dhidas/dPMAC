@@ -2,6 +2,10 @@
 #define GUARD_PMAC2Turbo_h
 
 #include <string>
+#include <vector>
+#include <map>
+#include <algorithm>
+#include <iostream>
 
 
 #define ETHERNETCMDSIZE 8
@@ -87,12 +91,52 @@ class PMAC2Turbo
     void GetBuffer (std::string const& OutFileName = "");
     void ListGather (std::string const& OutFileName = "");
 
+    std::string ReplaceDefinesInString (std::string const& InString);
 
   private:
     int fSocket;
     ETHERNETCMD fEthCmd;
     unsigned char fData[1401];
     std::string fDataSend;
+
+    std::vector< std::pair<std::string, std::string> > fDefinePairs;
+    static bool CompareDefinePair (std::pair<std::string, std::string> const& l, std::pair<std::string, std::string> const& r) {
+      return (l.first.size() > r.first.size());
+    }
+
+    int AddDefinePair (std::string const& Key, std::string const& Value) {
+      for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+        if (Key == it->first) {
+          std::cerr << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+          return 1;
+        }
+      }
+      fDefinePairs.push_back(std::make_pair(Key, Value));
+      std::sort(fDefinePairs.begin(), fDefinePairs.end(), CompareDefinePair);
+      return 0;
+    }
+    void ClearDefinePairs () {
+      fDefinePairs.clear();
+    }
+    void PrintDefinePairs () {
+      for (size_t i = 0; i != fDefinePairs.size(); ++i) {
+      }
+    }
+
+    std::string ReplaceDefines (std::string const& IN) {
+      std::string OUT = IN;
+
+      size_t pos;
+      for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+        pos = OUT.find(it->first);
+        while (pos != std::string::npos) {
+          OUT = std::string(OUT.begin(), OUT.begin() + pos) + it->second + std::string(OUT.begin() + pos + it->first.size(), OUT.end());
+          pos = OUT.find(it->first);
+        }
+      }
+
+      return OUT;
+    }
 
 
 };

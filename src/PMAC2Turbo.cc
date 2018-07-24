@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <exception>
 #include <string.h>
 //#include <sys/types.h>
@@ -238,11 +239,20 @@ void PMAC2Turbo::SendLine (std::string const& Line)
 int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 {
   // Download a file to PMAC.
-  // Returns:
+  // Returns : Number of errors
   //  -1    : Cannot open file
-  //   1    : Success
-  //  other : Write error
+  //   0    : No errors
  
+  std::cout << "Downloading included file: " << InFileName << std::endl;
+
+  static int NFileDepth = 0;
+  ++NFileDepth;
+
+  // Simple safeguard against recursive inclusion
+  if (NFileDepth >= 50) {
+    std::cerr << "Error: Backing out due to file depth limit reached.  Possibly you have a recursion on #include <file>" << std::endl;
+    return 1;
+  }
   // Open file for reading
   std::ifstream fi(InFileName);
   if (!fi.is_open()) {
@@ -250,10 +260,82 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     return -1;
   }
 
-  // Loop over each line in file
-  for (std::string Line; std::getline(fi, Line); ) {
 
-    std::cout << Line << std::endl;
+  bool IgnoreInput = false;
+
+  // Loop over each line in file
+  int i = 0;
+  for (std::string Line; std::getline(fi, Line); ++i) {
+
+    size_t begin_ignore = Line.find("/*");
+    size_t end_ignore = Line.find("*/");
+
+    while (begin_ignore != std::string::npos && end_ignore != std::string::npos) {
+      Line = std::string(Line.begin(), Line.begin() + begin_ignore) + std::string(Line.begin() + end_ignore + 2, Line.end());
+      begin_ignore = Line.find("/*");
+      end_ignore = Line.find("*/");
+    }
+
+    if (IgnoreInput && end_ignore != std::string::npos) {
+      IgnoreInput = false;
+      Line = std::string(Line.begin() + end_ignore + 2, Line.end());
+    } else if (IgnoreInput) {
+      continue;
+    }
+
+    if (!IgnoreInput && begin_ignore != std::string::npos) {
+      IgnoreInput = true;
+      Line = std::string(Line.begin(), Line.begin() + begin_ignore);
+    }
+
+    // Look for comment chars
+    size_t comment_pos = Line.find(";");
+    size_t first_comment_pos = comment_pos;
+    comment_pos = Line.find("//");
+    if (comment_pos < first_comment_pos) {
+      first_comment_pos = comment_pos;
+    }
+    if (first_comment_pos != std::string::npos) {
+      Line = std::string(Line.begin(), Line.begin() + first_comment_pos);
+    }
+
+    size_t include_pos = Line.find("#include ");
+    if (include_pos != std::string::npos) {
+      std::istringstream incstring(std::string(Line.begin() + include_pos + 9, Line.end()));
+      std::string key;
+      incstring >> key;
+      if (key.size() < 3) {
+        std::cerr << "Error in #include statement: " << Line << std::endl;
+        --NFileDepth;
+        return 1;
+      }
+      std::string NewFileName = std::string(key.begin() + 1, key.end() -1);
+      this->DownloadFile(NewFileName);
+      Line = "";
+    }
+
+
+    size_t define_pos = Line.find("#define ");
+    if (define_pos != std::string::npos) {
+      std::istringstream defstring(std::string(Line.begin() + define_pos + 8, Line.end()));
+      std::string key;
+      defstring >> key;
+
+      std::string value = std::string(Line.begin() + Line.find(key) + key.size() + 1, Line.end());
+      if (Line.find_last_not_of(" \t\f\v\n\r") != std::string::npos) {
+        value = std::string(value.begin(), value.begin() + value.find_last_not_of(" \t\f\v\n\r") + 1);
+      }
+      if (value.find_first_not_of(" \t\f\v\n\r") != std::string::npos) {
+        value = std::string(value.begin() + value.find_first_not_of(" \t\f\v\n\r"), value.end());
+      }
+      this->AddDefinePair(key, value);
+
+      Line = std::string(Line.begin(), Line.begin() + define_pos);
+    }
+
+    Line += '\0';
+
+    Line = this->ReplaceDefines(Line);
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
@@ -264,13 +346,25 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
 
-    PrintBits(fData[0]);
-    PrintBits(fData[1]);
-    PrintBits(fData[2]);
-    PrintBits(fData[3]);
+    // Check for an error
+    if (fData[3] == 0x80) {
+      std::cerr << "Error at line " << i << " in file " << InFileName << std::endl;
+      std::cerr << "  Input was: " << Line << std::endl;
+    }
+
+    //PrintBits(fData[0]);
+    //PrintBits(fData[1]);
+    //PrintBits(fData[2]);
+    //PrintBits(fData[3]);
   }
 
-  return 1;
+  --NFileDepth;
+  if (NFileDepth == 0) {
+    // Remove dictionary
+    this->ClearDefinePairs();
+  }
+
+  return 0;
 }
 
 
@@ -281,11 +375,36 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
   // Send a command line to PMAC
  
   this->Flush();
-  std::ifstream fi(Buffer);
-  if (!fi.is_open()) {
-    std::cerr << "ERROR: cannot open file: " << Buffer << std::endl;
-    return;
+
+  bool const EndsWithNULL = Buffer.back() == '\0';
+
+  //std::string::iterator itFrom = Buffer.begin();
+  //std::string::iterator itTo = Buffer.end();
+
+  /*
+  if (Buffer.size() < ToPosition) {
+    fEthCmd.RequestType = VR_DOWNLOAD;
+    fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
+    fEthCmd.wValue      = 0;
+    fEthCmd.wIndex      = 0;
+    fEthCmd.wLength     = htons(Line.size());
+    strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+    recv(fSocket, (char*) &fData, 4, 0);
+    int check =  fData[3];
+    std::cout << check << std::endl;
+    if (fData[3] == 0x80) {
+      std::cout << "HELLO ERROR" << std::endl;
+    }
   }
+
+  while (ToPosition < Buffer.size()) {
+    for ( ; ToPosition > FromPosition; --ToPosition) {
+      if (
+    }
+  }
+
+
 
   for (std::string Line; std::getline(fi, Line); ) {
 
@@ -310,6 +429,7 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
     PrintBits(fData[2]);
     PrintBits(fData[3]);
   }
+  */
 
   return;
 }
