@@ -249,6 +249,7 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
   for (std::string Line; std::getline(fi, Line); ) {
 
     std::cout << Line << std::endl;
+    Line += '\0';
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
