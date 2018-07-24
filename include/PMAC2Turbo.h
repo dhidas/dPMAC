@@ -79,7 +79,11 @@ class PMAC2Turbo
 
     void Connect (std::string const& IP, int const PORT = 1025);
     void Disconnect ();
+    void ReConnect ();
 
+    void Reset ();
+    void FactoryReset ();
+    void Save ();
     void Terminal ();
 
     void Flush ();
@@ -94,10 +98,14 @@ class PMAC2Turbo
     std::string ReplaceDefinesInString (std::string const& InString);
 
   private:
+    std::string fIP;
+    int fPORT;
+
     int fSocket;
     ETHERNETCMD fEthCmd;
     unsigned char fData[1401];
     std::string fDataSend;
+
 
     std::vector< std::pair<std::string, std::string> > fDefinePairs;
     static bool CompareDefinePair (std::pair<std::string, std::string> const& l, std::pair<std::string, std::string> const& r) {

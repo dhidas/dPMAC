@@ -66,8 +66,25 @@ PMAC2Turbo::~PMAC2Turbo ()
 
 
 
+void PMAC2Turbo::ReConnect ()
+{
+  // Reconnect the socket
+
+  // Hang up first if connected, then connect
+  this->Disconnect();
+  this->Connect(fIP, fPORT);
+
+  return;
+}
+
+
+
 void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
 {
+  // Store IP and PORT
+  fIP = IP;
+  fPORT = PORT;
+
   // Create and connect the socket
   fSocket = socket(PF_INET, SOCK_STREAM, 0);
   if (fSocket < 0) {
@@ -107,23 +124,123 @@ void PMAC2Turbo::Disconnect ()
 
 
 
+
+void PMAC2Turbo::Reset()
+{
+  // Send $$$ to the controller, pause, and flush
+  this->SendLine("$$$");
+  sleep(2);
+  this->Flush();
+
+  return;
+}
+
+
+
+
+void PMAC2Turbo::FactoryReset()
+{
+  // Send $$$ to the controller, pause, and flush
+  this->SendLine("$$$***");
+  sleep(2);
+  this->Flush();
+  this->SendLine("I3=2");
+  this->Flush();
+
+  return;
+}
+
+
+
+
+
+
+
+
+void PMAC2Turbo::Save ()
+{
+  // Send $$$ to the controller, pause, and flush
+  std::cout << "saving" << std::endl;
+  this->SendLine("save");
+  this->GetBuffer();
+  sleep(4);
+  this->Flush();
+
+  return;
+}
+
+
+
+
+
+
+
+
 void PMAC2Turbo::Terminal ()
 {
   // Simple terminal for PMAC2 using the readline library
 
+  // Start with a flushed buffer
   this->Flush();
 
   rl_bind_key (CTRLK, rl_insert);
   //rl_bind_key (CTRLK, static_cast<PMAC2Turbo*>(this)->SendCTRLK);
   rl_bind_key (CTRLD, rl_insert);
+
+
+  bool Logging = false;
+  std::string LogFileName = "";
+  std::ofstream LogFile;
+
+
   char* buf;
   while ((buf = readline(">> ")) != nullptr) {
     if (strlen(buf) > 0) {
       add_history(buf);
     }
 
-    this->SendLine(buf);
-    this->GetBuffer();
+
+    std::string bs = std::string(buf);
+    size_t first_nws = bs.find_first_not_of(" \t\f\v\n\r");
+    if (first_nws != 0 && first_nws != std::string::npos) {
+      bs = std::string(bs.begin() + first_nws, bs.end());
+    }
+
+    if (bs == ".h") {
+      std::cout << "Commands:" << std::endl;
+      std::cout << "  .h        - print help" << std::endl;
+      std::cout << "  .q        - quit" << std::endl;
+      std::cout << "  .d [file] - Download file to pmac" << std::endl;
+    } else if (bs == "$$$") {
+      this->Reset();
+    } else if (bs == "$$$***") {
+      this->FactoryReset();
+    } else if (bs == "save") {
+      this->Save();
+    } else if (bs.find(".q") == 0) {
+      return;
+    } else if (bs.find(".d") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      ss >> fn;
+      this->DownloadFile(fn);
+    } else {
+      this->SendLine(buf);
+      this->GetBuffer();
+    }
+
+    if (Logging && LogFileName != "" && !LogFile.is_open()) {
+      LogFile.open(LogFileName);
+      if (!LogFile.is_open()) {
+        std::cerr << "ERROR: cannot open logfile: " << LogFileName << std::endl;
+        Logging = false;
+      }
+    }
+
+    if (Logging) {
+      LogFile << ">> " << bs << std::endl;
+    }
 
     // readline malloc's a new buffer every time.
     free(buf);
