@@ -82,6 +82,7 @@ class PMAC2Turbo
     void IPAddress (std::string const& IP = "");
     void SendCTRLK ();
     void SendLine (std::string const& Line);
+    int  DownloadFile (std::string const& InFileName);
     void WriteBuffer (std::string const& Buffer);
     void GetBuffer (std::string const& OutFileName = "");
     void ListGather (std::string const& OutFileName = "");

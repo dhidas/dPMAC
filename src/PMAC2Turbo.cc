@@ -234,6 +234,47 @@ void PMAC2Turbo::SendLine (std::string const& Line)
 
 
 
+int PMAC2Turbo::DownloadFile (std::string const& InFileName)
+{
+  // Download a file to PMAC.
+  // Returns:
+  //  -1    : Cannot open file
+  //   1    : Success
+  //  other : Write error
+ 
+  // Open file for reading
+  std::ifstream fi(InFileName);
+  if (!fi.is_open()) {
+    std::cerr << "ERROR: cannot open file: " << InFileName << std::endl;
+    return -1;
+  }
+
+  // Loop over each line in file
+  for (std::string Line; std::getline(fi, Line); ) {
+
+    std::cout << Line << std::endl;
+
+    fEthCmd.RequestType = VR_DOWNLOAD;
+    fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
+    fEthCmd.wValue      = 0;
+    fEthCmd.wIndex      = 0;
+    fEthCmd.wLength     = htons(Line.size());
+    strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+    recv(fSocket, (char*) &fData, 4, 0);
+
+    PrintBits(fData[0]);
+    PrintBits(fData[1]);
+    PrintBits(fData[2]);
+    PrintBits(fData[3]);
+  }
+
+  return 1;
+}
+
+
+
+
 void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
 {
   // Send a command line to PMAC
