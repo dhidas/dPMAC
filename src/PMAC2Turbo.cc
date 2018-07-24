@@ -30,7 +30,8 @@
 
 void PrintBits (char c)
 {
-  std::cout << std::bitset<8>(c).to_ulong() << std::endl;
+  std::bitset<8> b(c);
+  std::cout << b << " " << b.to_ulong() << std::endl;
   return;
 }
 
@@ -279,6 +280,7 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
 {
   // Send a command line to PMAC
  
+  this->Flush();
   std::ifstream fi(Buffer);
   if (!fi.is_open()) {
     std::cerr << "ERROR: cannot open file: " << Buffer << std::endl;
@@ -288,6 +290,7 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
   for (std::string Line; std::getline(fi, Line); ) {
 
     std::cout << Line << std::endl;
+    Line += '\0';
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
@@ -297,6 +300,11 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
     strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
+    int check =  fData[3];
+    std::cout << check << std::endl;
+    if (fData[3] == 0x80) {
+      std::cout << "HELLO ERROR" << std::endl;
+    }
     PrintBits(fData[0]);
     PrintBits(fData[1]);
     PrintBits(fData[2]);
