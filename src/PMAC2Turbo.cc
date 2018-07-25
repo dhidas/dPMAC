@@ -29,13 +29,6 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-void PrintBits (char c)
-{
-  std::bitset<8> b(c);
-  std::cout << b << " " << b.to_ulong() << std::endl;
-  return;
-}
-
 PMAC2Turbo::PMAC2Turbo ()
 {
   // Default constructor
@@ -208,9 +201,11 @@ void PMAC2Turbo::Terminal ()
 
     if (bs == ".h") {
       std::cout << "Commands:" << std::endl;
-      std::cout << "  .h        - print help" << std::endl;
-      std::cout << "  .q        - quit" << std::endl;
-      std::cout << "  .d [file] - Download file to pmac" << std::endl;
+      std::cout << "  .h            - print help" << std::endl;
+      std::cout << "  .q            - quit" << std::endl;
+      std::cout << "  .d [file]     - Download file to pmac" << std::endl;
+      std::cout << "  .g [file]     - Upload gather buffer from pmac to file" << std::endl;
+      std::cout << "  .b [file]     - Upload backup CFG from pmac to file" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
@@ -224,7 +219,23 @@ void PMAC2Turbo::Terminal ()
       std::string fn;
       ss >> fn;
       ss >> fn;
-      this->DownloadFile(fn);
+      if (fn != "") {
+        this->DownloadFile(fn);
+      } else {
+        std::cout << "Usage: .d [file]" << std::endl;
+      }
+    } else if (bs.find(".g") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      ss >> fn;
+      if (fn != "") {
+        this->ListGather(fn);
+      } else {
+        std::cout << "Usage: .g [file]" << std::endl;
+      }
+    } else if (bs.find(".b") == 0) {
+      std::cout << ".b [file] : Not implemented yet" << std::endl;
     } else {
       this->SendLine(buf);
       this->GetBuffer();
@@ -554,19 +565,22 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
 
 
 
-void PMAC2Turbo::GetBuffer (std::string const& OutFileName)
+void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
 {
   // File for writing if name given
-  std::ofstream of;
-  if (OutFileName != "") {
-    of.open(OutFileName.c_str());
-    if (!of.is_open()) {
+  if (fo != 0x0 && !fo->is_open()) {
+    std::cerr << "ERROR: output file stream is not open" << std::endl;
+  }
+
+  bool FileNewObjectCreated = false;
+  if (fo == 0x0 && OutFileName != "") {
+    fo = new std::ofstream(OutFileName.c_str());
+    FileNewObjectCreated = true;
+
+    if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open OutFileName: " << OutFileName << std::endl;
     }
   }
-
-  // Write to file or std::cout
-  std::ostream* out = of.is_open() ? &of : &std::cout ;
 
   // For the output commands
   fEthCmd.RequestType = VR_UPLOAD;
@@ -608,10 +622,19 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName)
     if (cr_at < 0) {
     } else {
       for (int j = 0; j < cr_at; ++j) {
-        *out << fData[j];
+        std::cout << fData[j];
       }
       if (!ack_found) {
-        *out << std::endl;
+        std::cout << std::endl;
+      }
+
+      if (fo != 0x0) {
+        for (int j = 0; j < cr_at; ++j) {
+          *fo << fData[j];
+        }
+        if (!ack_found) {
+          *fo << std::endl;
+        }
       }
     }
     if (ack_found) {
@@ -625,6 +648,15 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName)
     fEthCmd.wLength     = htons(2);
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
     recv(fSocket, fData, 2, 0);
+  }
+
+  if (FileNewObjectCreated) {
+    try {
+      fo->close();
+      delete fo;
+    } catch (...) {
+      // do nothing
+    }
   }
 
   return;
@@ -649,5 +681,80 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
   this->GetBuffer(OutFileName);
   this->Flush();
 
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
+{
+  for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+    if (Key == it->first) {
+      std::cerr << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+      return 1;
+    }
+  }
+  fDefinePairs.push_back(std::make_pair(Key, Value));
+  std::sort(fDefinePairs.begin(), fDefinePairs.end(), CompareDefinePair);
+  return 0;
+}
+
+
+
+
+void PMAC2Turbo::ClearDefinePairs ()
+{
+  fDefinePairs.clear();
+}
+
+
+
+void PMAC2Turbo::PrintDefinePairs ()
+{
+  for (size_t i = 0; i != fDefinePairs.size(); ++i) {
+  }
+}
+
+
+
+
+std::string PMAC2Turbo::ReplaceDefines (std::string const& IN)
+{
+  std::string OUT = IN;
+
+  size_t pos;
+  for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+    pos = OUT.find(it->first);
+    while (pos != std::string::npos) {
+      OUT = std::string(OUT.begin(), OUT.begin() + pos) + it->second + std::string(OUT.begin() + pos + it->first.size(), OUT.end());
+      pos = OUT.find(it->first);
+    }
+  }
+
+  return OUT;
+}
+
+
+
+
+
+void PMAC2Turbo::PrintBits (char c) const
+{
+  std::bitset<8> b(c);
+  std::cout << b << " " << b.to_ulong() << std::endl;
   return;
 }

@@ -92,10 +92,13 @@ class PMAC2Turbo
     void SendLine (std::string const& Line);
     int  DownloadFile (std::string const& InFileName);
     void WriteBuffer (std::string const& Buffer);
-    void GetBuffer (std::string const& OutFileName = "");
+    void GetBuffer (std::string const& OutFileName = "", std::ofstream* fo = 0x0);
     void ListGather (std::string const& OutFileName = "");
 
     std::string ReplaceDefinesInString (std::string const& InString);
+
+    void PrintBits (char c) const;
+
 
   private:
     std::string fIP;
@@ -106,46 +109,20 @@ class PMAC2Turbo
     unsigned char fData[1401];
     std::string fDataSend;
 
-
     std::vector< std::pair<std::string, std::string> > fDefinePairs;
-    static bool CompareDefinePair (std::pair<std::string, std::string> const& l, std::pair<std::string, std::string> const& r) {
+
+    static bool CompareDefinePair (std::pair<std::string, std::string> const& l, std::pair<std::string, std::string> const& r)
+    {
       return (l.first.size() > r.first.size());
     }
 
-    int AddDefinePair (std::string const& Key, std::string const& Value) {
-      for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
-        if (Key == it->first) {
-          std::cerr << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-          return 1;
-        }
-      }
-      fDefinePairs.push_back(std::make_pair(Key, Value));
-      std::sort(fDefinePairs.begin(), fDefinePairs.end(), CompareDefinePair);
-      return 0;
-    }
-    void ClearDefinePairs () {
-      fDefinePairs.clear();
-    }
-    void PrintDefinePairs () {
-      for (size_t i = 0; i != fDefinePairs.size(); ++i) {
-      }
-    }
 
-    std::string ReplaceDefines (std::string const& IN) {
-      std::string OUT = IN;
 
-      size_t pos;
-      for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
-        pos = OUT.find(it->first);
-        while (pos != std::string::npos) {
-          OUT = std::string(OUT.begin(), OUT.begin() + pos) + it->second + std::string(OUT.begin() + pos + it->first.size(), OUT.end());
-          pos = OUT.find(it->first);
-        }
-      }
+    int AddDefinePair (std::string const& Key, std::string const& Value);
+    void ClearDefinePairs ();
+    void PrintDefinePairs ();
 
-      return OUT;
-    }
-
+    std::string ReplaceDefines (std::string const& IN);
 
 };
 
