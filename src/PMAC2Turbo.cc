@@ -82,6 +82,7 @@ void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
   fSocket = socket(PF_INET, SOCK_STREAM, 0);
   if (fSocket < 0) {
     std::cerr << "ERROR: Cannot create socket" << std::endl;
+    l() && fL << "ERROR: Cannot create socket" << std::endl;
   }
 
   // Server socket address struct
@@ -96,6 +97,7 @@ void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
   if (connect(fSocket,(struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
   } else {
     std::cerr << "Error when connecting to server " << IP << " on port " << PORT << std::endl;
+    l() && fL << "Error when connecting to server " << IP << " on port " << PORT << std::endl;
     return;
   }
 
@@ -113,6 +115,37 @@ void PMAC2Turbo::Disconnect ()
 
   return;
 }
+
+
+
+
+void PMAC2Turbo::StartLog (std::string const& OutFileName)
+{
+
+  std::cout << "Start logging to: " << OutFileName << std::endl;
+  // Open log file for writing
+  fL.open(OutFileName);
+  if (!fL.is_open()) {
+    std::cerr << "ERROR: cannot open logfile for writing: " << OutFileName << std::endl;
+    return;
+  }
+  return;
+}
+
+
+
+
+void PMAC2Turbo::StopLog ()
+{
+  if (fL.is_open()) {
+    fL.close();
+  } else {
+    std::cerr << "ERROR: logfile was already closed.  nothing done." << std::endl;
+  }
+  return;
+}
+
+
 
 
 
@@ -154,6 +187,7 @@ void PMAC2Turbo::Save ()
 {
   // Send $$$ to the controller, pause, and flush
   std::cout << "saving" << std::endl;
+  l() && fL << "saving" << std::endl;
   this->SendLine("save");
   this->GetBuffer();
   sleep(4);
@@ -192,6 +226,7 @@ void PMAC2Turbo::Terminal ()
       add_history(buf);
     }
 
+    l() && fL << ">> " << buf << std::endl;
 
     std::string bs = std::string(buf);
     size_t first_nws = bs.find_first_not_of(" \t\f\v\n\r");
@@ -201,25 +236,61 @@ void PMAC2Turbo::Terminal ()
 
     if (bs == ".h") {
       std::cout << "Commands:" << std::endl;
-      std::cout << "  .h            - print help" << std::endl;
-      std::cout << "  .q            - quit" << std::endl;
-      std::cout << "  .d [file]     - Download file to pmac" << std::endl;
-      std::cout << "  .g [file]     - Upload gather buffer from pmac to file" << std::endl;
-      std::cout << "  .b [file]     - Upload backup CFG from pmac to file" << std::endl;
+      std::cout << "  .h                           - print help" << std::endl;
+      std::cout << "  .q                           - quit" << std::endl;
+      std::cout << "  .d [file]                    - Download file to pmac" << std::endl;
+      std::cout << "  .l [file]                    - logging (without [file] is to stop, with will log to file" << std::endl;
+      std::cout << "  .g [file]                    - Upload gather buffer from pmac to file" << std::endl;
+      std::cout << "  .b [file]                    - Upload backup CFG from pmac to file" << std::endl;
+      std::cout << "  .ivars [file] [start] [stop] - dump ivariables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .pvars [file] [start] [stop] - dump ivariables to file (start stop optional integers)" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
       this->FactoryReset();
     } else if (bs == "save") {
       this->Save();
+    } else if (bs.find(".ivars") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 8191;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        std::cout << "first: " << first << "  last: " << last << std::endl;
+        l() && fL << "first: " << first << "  last: " << last << std::endl;
+        this->IVariableDump(fn, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
     } else if (bs.find(".q") == 0) {
+      if (l()) {
+        this->StopLog();
+      }
+      free(buf);
       return;
+    } else if (bs.find(".l") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      if (fn.size() > 0) {
+        this->StartLog(fn);
+      } else {
+        this->StopLog();
+      }
     } else if (bs.find(".d") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
+      fn = "";
       ss >> fn;
-      if (fn != "") {
+      if (fn.size() > 0) {
         this->DownloadFile(fn);
       } else {
         std::cout << "Usage: .d [file]" << std::endl;
@@ -228,8 +299,9 @@ void PMAC2Turbo::Terminal ()
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
+      fn = "";
       ss >> fn;
-      if (fn != "") {
+      if (fn.size() > 0) {
         this->ListGather(fn);
       } else {
         std::cout << "Usage: .g [file]" << std::endl;
@@ -249,9 +321,6 @@ void PMAC2Turbo::Terminal ()
       }
     }
 
-    if (Logging) {
-      LogFile << ">> " << bs << std::endl;
-    }
 
     // readline malloc's a new buffer every time.
     free(buf);
@@ -311,6 +380,10 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
               << std::bitset<8>(fData[1]).to_ulong() << "."
               << std::bitset<8>(fData[2]).to_ulong() << "."
               << std::bitset<8>(fData[3]).to_ulong() << std::endl;
+    l() && fL << std::bitset<8>(fData[0]).to_ulong() << "."
+              << std::bitset<8>(fData[1]).to_ulong() << "."
+              << std::bitset<8>(fData[2]).to_ulong() << "."
+              << std::bitset<8>(fData[3]).to_ulong() << std::endl;
   }
 
   return;
@@ -337,7 +410,6 @@ void PMAC2Turbo::SendCTRLK ()
   send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
   recv(fSocket, fData, 1, 0);
 
-  std::cout << "data back: " << fData << std::endl;
   return;
 }
 
@@ -372,6 +444,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   //   0    : No errors
  
   std::cout << "Downloading included file: " << InFileName << std::endl;
+  l() && fL << "Downloading included file: " << InFileName << std::endl;
 
   static int NFileDepth = 0;
   ++NFileDepth;
@@ -379,12 +452,14 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   // Simple safeguard against recursive inclusion
   if (NFileDepth >= 50) {
     std::cerr << "Error: Backing out due to file depth limit reached.  Possibly you have a recursion on #include <file>" << std::endl;
+    l() && fL << "Error: Backing out due to file depth limit reached.  Possibly you have a recursion on #include <file>" << std::endl;
     return 1;
   }
   // Open file for reading
   std::ifstream fi(InFileName);
   if (!fi.is_open()) {
     std::cerr << "ERROR: cannot open file: " << InFileName << std::endl;
+    l() && fL << "ERROR: cannot open file: " << InFileName << std::endl;
     return -1;
   }
 
@@ -434,6 +509,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       incstring >> key;
       if (key.size() < 3) {
         std::cerr << "Error in #include statement: " << Line << std::endl;
+        l() && fL << "Error in #include statement: " << Line << std::endl;
         --NFileDepth;
         return 1;
       }
@@ -480,10 +556,6 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       std::cerr << "  Input was: " << Line << std::endl;
     }
 
-    //PrintBits(fData[0]);
-    //PrintBits(fData[1]);
-    //PrintBits(fData[2]);
-    //PrintBits(fData[3]);
   }
 
   --NFileDepth;
@@ -565,6 +637,29 @@ void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
 
 
 
+std::string PMAC2Turbo::GetResponseString (std::string const& Line)
+{
+  // Send a command line to PMAC
+ 
+  this->Flush();
+
+  // For the output commands
+  fEthCmd.RequestType = VR_DOWNLOAD;
+  fEthCmd.Request     = VR_PMAC_GETRESPONSE;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(Line.size());
+
+  strncpy((char*) &fEthCmd.bData[0], Line.c_str(),  Line.size());
+  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
+  recv(fSocket, fData, 1400, 0);
+
+  return std::string((const char*) fData);
+}
+
+
+
+
 void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
 {
   // File for writing if name given
@@ -623,9 +718,11 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
     } else {
       for (int j = 0; j < cr_at; ++j) {
         std::cout << fData[j];
+        l() && fL << fData[j];
       }
       if (!ack_found) {
         std::cout << std::endl;
+        l() && fL << std::endl;
       }
 
       if (fo != 0x0) {
@@ -690,6 +787,49 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
 
 
 
+void PMAC2Turbo::IVariableDump (std::string const& OutFileName, int const First, int const Last)
+{
+  // Check if socket at least defined
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Trying to IVariableDump but socket not created" << std::endl;
+    return;
+  }
+
+  // Open file for writing
+  std::ofstream fo(OutFileName);
+  if (!fo.is_open()) {
+    std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+    l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+  }
+
+  char command[20];
+  std::string response = "";
+  for (int i = First; i < Last; ++i) {
+    sprintf(command, "I%04i", i);
+    response = this->GetResponseString(command);
+    std::cout << command << "=" << response << std::endl;
+    l() && fL << command << "=" << response << std::endl;
+    if (fo.is_open()) {
+      fo << command << "=" << response << std::endl;
+    }
+  }
+
+  fo.close();
+  return;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -705,6 +845,7 @@ int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
   for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
     if (Key == it->first) {
       std::cerr << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+      l() && fL << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
       return 1;
     }
   }
@@ -752,9 +893,10 @@ std::string PMAC2Turbo::ReplaceDefines (std::string const& IN)
 
 
 
-void PMAC2Turbo::PrintBits (char c) const
+void PMAC2Turbo::PrintBits (char c)
 {
   std::bitset<8> b(c);
   std::cout << b << " " << b.to_ulong() << std::endl;
+  l() && fL << b << " " << b.to_ulong() << std::endl;
   return;
 }

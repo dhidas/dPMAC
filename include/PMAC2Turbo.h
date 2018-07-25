@@ -6,6 +6,7 @@
 #include <map>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 
 #define ETHERNETCMDSIZE 8
@@ -31,12 +32,12 @@
 #pragma pack(1)
 typedef struct tagEthernetCmd
 {
-    unsigned char RequestType;
-    unsigned char Request;
-    unsigned short wValue;
-    unsigned short wIndex;
-    unsigned short wLength; /* length of bData */
-    unsigned char bData[ETHERNET_DATA_SIZE];
+  unsigned char RequestType;
+  unsigned char Request;
+  unsigned short wValue;
+  unsigned short wIndex;
+  unsigned short wLength; /* length of bData */
+  unsigned char bData[ETHERNET_DATA_SIZE];
 } ETHERNETCMD,*PETHERNETCMD;
 #pragma pack()
 
@@ -81,6 +82,9 @@ class PMAC2Turbo
     void Disconnect ();
     void ReConnect ();
 
+    void StartLog (std::string const& OutFileName);
+    void StopLog ();
+
     void Reset ();
     void FactoryReset ();
     void Save ();
@@ -92,12 +96,14 @@ class PMAC2Turbo
     void SendLine (std::string const& Line);
     int  DownloadFile (std::string const& InFileName);
     void WriteBuffer (std::string const& Buffer);
+    std::string GetResponseString (std::string const& Line);
     void GetBuffer (std::string const& OutFileName = "", std::ofstream* fo = 0x0);
     void ListGather (std::string const& OutFileName = "");
+    void IVariableDump (std::string const& OutFileName, int const First = 0, int const Last = 8191);
 
     std::string ReplaceDefinesInString (std::string const& InString);
 
-    void PrintBits (char c) const;
+    void PrintBits (char c);
 
 
   private:
@@ -108,6 +114,13 @@ class PMAC2Turbo
     ETHERNETCMD fEthCmd;
     unsigned char fData[1401];
     std::string fDataSend;
+
+    std::ofstream fL;
+    
+    inline bool l()
+    {
+      return fL.is_open();
+    }
 
     std::vector< std::pair<std::string, std::string> > fDefinePairs;
 
