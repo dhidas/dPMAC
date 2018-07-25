@@ -23,6 +23,7 @@
 #define BELL  '\7'
 #define CTRLG '\7'
 #define CTRLK  0X0B
+#define CTRLM  0X0D
 #define CTRLP '\16'
 #define CTRLV '\22'
 #define CTRLX '\24'
@@ -99,7 +100,8 @@ class PMAC2Turbo
     std::string GetResponseString (std::string const& Line);
     void GetBuffer (std::string const& OutFileName = "", std::ofstream* fo = 0x0);
     void ListGather (std::string const& OutFileName = "");
-    void IVariableDump (std::string const& OutFileName, int const First = 0, int const Last = 8191);
+    void VariableDump (std::string const& V, std::string const& OutFileName, int const First = 0, int const Last = 8191);
+    void MakeBackup (std::string const& OutFileName);
 
     std::string ReplaceDefinesInString (std::string const& InString);
 

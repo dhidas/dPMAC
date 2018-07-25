@@ -238,19 +238,21 @@ void PMAC2Turbo::Terminal ()
       std::cout << "Commands:" << std::endl;
       std::cout << "  .h                           - print help" << std::endl;
       std::cout << "  .q                           - quit" << std::endl;
-      std::cout << "  .d [file]                    - Download file to pmac" << std::endl;
-      std::cout << "  .l [file]                    - logging (without [file] is to stop, with will log to file" << std::endl;
-      std::cout << "  .g [file]                    - Upload gather buffer from pmac to file" << std::endl;
-      std::cout << "  .b [file]                    - Upload backup CFG from pmac to file" << std::endl;
-      std::cout << "  .ivars [file] [start] [stop] - dump ivariables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .pvars [file] [start] [stop] - dump ivariables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .d  [file]                   - Download file to pmac" << std::endl;
+      std::cout << "  .l  [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
+      std::cout << "  .g  [file]                   - Upload gather buffer from pmac to file" << std::endl;
+      std::cout << "  .b  [file]                   - Upload backup CFG from pmac to file" << std::endl;
+      std::cout << "  .iv [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .pv [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .qv [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mv [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
       this->FactoryReset();
     } else if (bs == "save") {
       this->Save();
-    } else if (bs.find(".ivars") == 0) {
+    } else if (bs.find(".iv") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
@@ -263,7 +265,58 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         std::cout << "first: " << first << "  last: " << last << std::endl;
         l() && fL << "first: " << first << "  last: " << last << std::endl;
-        this->IVariableDump(fn, first, last);
+        this->VariableDump("I", fn, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
+    } else if (bs.find(".pv") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 8191;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        std::cout << "first: " << first << "  last: " << last << std::endl;
+        l() && fL << "first: " << first << "  last: " << last << std::endl;
+        this->VariableDump("P", fn, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
+    } else if (bs.find(".qv") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 8191;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        std::cout << "first: " << first << "  last: " << last << std::endl;
+        l() && fL << "first: " << first << "  last: " << last << std::endl;
+        this->VariableDump("Q", fn, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
+    } else if (bs.find(".mv") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 8191;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        std::cout << "first: " << first << "  last: " << last << std::endl;
+        l() && fL << "first: " << first << "  last: " << last << std::endl;
+        this->VariableDump("M", fn, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -307,7 +360,16 @@ void PMAC2Turbo::Terminal ()
         std::cout << "Usage: .g [file]" << std::endl;
       }
     } else if (bs.find(".b") == 0) {
-      std::cout << ".b [file] : Not implemented yet" << std::endl;
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      if (fn.size() > 0) {
+        this->MakeBackup(fn);
+      } else {
+        std::cout << "Usage: .b [file]" << std::endl;
+      }
     } else {
       this->SendLine(buf);
       this->GetBuffer();
@@ -443,8 +505,8 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   //  -1    : Cannot open file
   //   0    : No errors
  
-  std::cout << "Downloading included file: " << InFileName << std::endl;
-  l() && fL << "Downloading included file: " << InFileName << std::endl;
+  std::cout << "Downloading file: " << InFileName << std::endl;
+  l() && fL << "Downloading file: " << InFileName << std::endl;
 
   static int NFileDepth = 0;
   ++NFileDepth;
@@ -654,7 +716,20 @@ std::string PMAC2Turbo::GetResponseString (std::string const& Line)
   send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
   recv(fSocket, fData, 1400, 0);
 
-  return std::string((const char*) fData);
+  char ret[1400];
+  for (int i = 0, j = 0; i != 1400; ++i) {
+    if (fData[i] == ACK) {
+      ret[j++] = '\0';
+      break;
+    } else if (fData[i] == CTRLM) {
+      ret[j++] = ' ';
+    } else {
+      ret[j++] = fData[i];
+    }
+  }
+
+
+  return std::string(ret);
 }
 
 
@@ -787,11 +862,11 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
 
 
 
-void PMAC2Turbo::IVariableDump (std::string const& OutFileName, int const First, int const Last)
+void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileName, int const First, int const Last)
 {
   // Check if socket at least defined
   if (fSocket < 0) {
-    std::cerr << "ERROR: Trying to IVariableDump but socket not created" << std::endl;
+    std::cerr << "ERROR: Trying to VariableDump but socket not created" << std::endl;
     return;
   }
 
@@ -805,7 +880,7 @@ void PMAC2Turbo::IVariableDump (std::string const& OutFileName, int const First,
   char command[20];
   std::string response = "";
   for (int i = First; i < Last; ++i) {
-    sprintf(command, "I%04i", i);
+    sprintf(command, "%s%04i", V.c_str(), i);
     response = this->GetResponseString(command);
     std::cout << command << "=" << response << std::endl;
     l() && fL << command << "=" << response << std::endl;
@@ -822,6 +897,48 @@ void PMAC2Turbo::IVariableDump (std::string const& OutFileName, int const First,
 
 
 
+
+void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
+{
+  // Check if socket at least defined
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Trying to MakeBackup but socket not created" << std::endl;
+    return;
+  }
+
+  // Open file for writing
+  std::ofstream fo(OutFileName);
+  if (!fo.is_open()) {
+    std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+    l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+  }
+
+
+  char command[20];
+  std::string response = "";
+
+  int const First = 0;
+  int const Last  = 8191;
+
+  std::vector<std::string> V;
+  V.push_back("I");
+  V.push_back("P");
+  V.push_back("Q");
+  V.push_back("M");
+
+  for (std::vector<std::string>::iterator iv = V.begin(); iv != V.end(); ++iv) {
+    for (int i = First; i < Last; ++i) {
+      sprintf(command, "%s%04i", iv->c_str(), i);
+      response = this->GetResponseString(command);
+      fo << command << "=" << response << std::endl;
+    }
+  }
+
+  fo.close();
+
+
+  return;
+}
 
 
 
