@@ -368,7 +368,8 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         this->MakeBackup(fn);
       } else {
-        std::cout << "Usage: .b [file]" << std::endl;
+        std::cout << "saving to backup.CFG" << std::endl;
+        this->MakeBackup("backup.CFG");
       }
     } else {
       this->SendLine(buf);
@@ -735,18 +736,16 @@ std::string PMAC2Turbo::GetResponseString (std::string const& Line)
 
 
 
-void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
+void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bool const cout)
 {
   // File for writing if name given
-  if (fo != 0x0 && !fo->is_open()) {
-    std::cerr << "ERROR: output file stream is not open" << std::endl;
+  if (so != 0x0 && !so->good()) {
+    std::cerr << "ERROR: output stream is not good" << std::endl;
   }
 
-  bool FileNewObjectCreated = false;
-  if (fo == 0x0 && OutFileName != "") {
+  std::ofstream* fo = 0x0;
+  if (OutFileName != "") {
     fo = new std::ofstream(OutFileName.c_str());
-    FileNewObjectCreated = true;
-
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open OutFileName: " << OutFileName << std::endl;
     }
@@ -792,22 +791,26 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
     if (cr_at < 0) {
     } else {
       for (int j = 0; j < cr_at; ++j) {
-        std::cout << fData[j];
+        cout && std::cout << fData[j];
+        so   &&       *so << fData[j];
+        fo   &&       *fo << fData[j];
         l() && fL << fData[j];
       }
       if (!ack_found) {
-        std::cout << std::endl;
+        cout && std::cout << std::endl;
+        so   &&       *so << std::endl;
+        fo   &&       *fo << std::endl;
         l() && fL << std::endl;
       }
 
-      if (fo != 0x0) {
-        for (int j = 0; j < cr_at; ++j) {
-          *fo << fData[j];
-        }
-        if (!ack_found) {
-          *fo << std::endl;
-        }
-      }
+//      if (fo != 0x0) {
+//        for (int j = 0; j < cr_at; ++j) {
+//          *fo << fData[j];
+//        }
+//        if (!ack_found) {
+//          *fo << std::endl;
+//        }
+//      }
     }
     if (ack_found) {
       break;
@@ -822,11 +825,12 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ofstream* fo)
     recv(fSocket, fData, 2, 0);
   }
 
-  if (FileNewObjectCreated) {
+  if (fo) {
     try {
       fo->close();
       delete fo;
     } catch (...) {
+      std::cerr << "Warning: Closing and delete file object is in error state" << std::endl;
       // do nothing
     }
   }
@@ -914,25 +918,168 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   }
 
 
-  char command[20];
-  std::string response = "";
+  // For collecting data from GetBuffer (faster than individual calls)
+  std::ostringstream oss;
+  std::istringstream iss;
+  std::string s;
+
 
   int const First = 0;
   int const Last  = 8191;
 
-  std::vector<std::string> V;
-  V.push_back("I");
-  V.push_back("P");
-  V.push_back("Q");
-  V.push_back("M");
 
-  for (std::vector<std::string>::iterator iv = V.begin(); iv != V.end(); ++iv) {
-    for (int i = First; i < Last; ++i) {
-      sprintf(command, "%s%04i", iv->c_str(), i);
-      response = this->GetResponseString(command);
-      fo << command << "=" << response << std::endl;
+
+  std::cout << "Uploading I Variables" << std::endl;
+  l() && fL << "Uploading I Variables" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; I-Variables ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+
+  this->SendLine("I0..8191");
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    fo << "I" << i << "=" << s << std::endl;
+  }
+
+
+
+  std::cout << "Uploading P Variables" << std::endl;
+  l() && fL << "Uploading P Variables" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; P-Variables ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+
+  this->SendLine("P0..8191");
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    fo << "P" << i << "=" << s << std::endl;
+  }
+
+
+
+  std::cout << "Uploading Q Variables" << std::endl;
+  l() && fL << "Uploading Q Variables" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; Q-Variables ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+
+  this->SendLine("Q0..8191");
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    fo << "Q" << i << "=" << s << std::endl;
+  }
+
+
+
+  std::cout << "Uploading M Variable definitions" << std::endl;
+  l() && fL << "Uploading M Variable definitions" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; M-Variable Definitions ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+
+  this->SendLine("M0..8191->");
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    fo << "M" << i << "=" << s << std::endl;
+  }
+
+
+
+  std::cout << "Uploading PLCs" << std::endl;
+  l() && fL << "Uploading PLCs" << std::endl;
+
+  fo << ";;;;;;;;;;" << std::endl;
+  fo << ";; PLCs ;;" << std::endl;
+  fo << ";;;;;;;;;;" << std::endl << std::endl;
+  char command[100];
+  for (int i = 0; i != 32; ++i) {
+    sprintf(command, "LIST PLC %i", i);
+
+    this->SendLine(command);
+    this->GetBuffer("", &oss, false);
+    std::string mystr = oss.str();
+    oss.str("");
+    if (mystr.size() > 0) {
+      size_t pos_ret = mystr.find("RET");
+      if (pos_ret != std::string::npos) {
+        mystr.replace(pos_ret, 3, "CLOSE");
+      }
+      fo << "OPEN PLC " << i << " CLEAR" << std::endl;
+      fo << mystr << std::endl;;
     }
   }
+
+
+
+  std::cout << "Uploading COORDINATE SYSTEMS" << std::endl;
+  l() && fL << "Uploading COORDINATE SYSTEMS" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; COORDINATE SYSTEMS ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+
+  fo << "UNDEFINE ALL" << std::endl;
+  for (int i = 1; i <= 16; ++i) {
+    fo << ";; CS " << i << std::endl;
+    sprintf(command, "&%i", i);
+    fo << command << std::endl;
+    this->SendLine(command);
+    this->Flush();
+
+    for (int im = 1; im <= 32; ++im) {
+      sprintf(command, "#%i->", i);
+      this->SendLine(command);
+
+      this->GetBuffer("", &oss, false);
+      fo << "#" << im << "->" << oss.str();
+      oss.str("");
+    }
+    fo << std::endl;
+  }
+
+
+
+  std::cout << "Uploading Motion Programs" << std::endl;
+  l() && fL << "Uploading Motion Programs" << std::endl;
+
+  fo << ";;;;;;;;;;;;;;;;;;;;;" << std::endl;
+  fo << ";; Motion Programs ;;" << std::endl;
+  fo << ";;;;;;;;;;;;;;;;;;;;;" << std::endl << std::endl;
+  // Technically this can go to 32767
+  for (int i = 0; i <= 32; ++i) {
+    sprintf(command, "LIST PROG %i", i);
+
+    this->SendLine(command);
+    this->GetBuffer("", &oss, false);
+    std::string mystr = oss.str();
+    oss.str("");
+    if (mystr.size() > 0) {
+      size_t pos_ret = mystr.find("RET");
+      if (pos_ret != std::string::npos) {
+        mystr.replace(pos_ret, 3, "CLOSE");
+        fo << "OPEN PROG " << i << " CLEAR" << std::endl;
+        fo << mystr << std::endl;;
+      }
+    }
+  }
+
+
 
   fo.close();
 

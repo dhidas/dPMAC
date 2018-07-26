@@ -98,7 +98,7 @@ class PMAC2Turbo
     int  DownloadFile (std::string const& InFileName);
     void WriteBuffer (std::string const& Buffer);
     std::string GetResponseString (std::string const& Line);
-    void GetBuffer (std::string const& OutFileName = "", std::ofstream* fo = 0x0);
+    void GetBuffer (std::string const& OutFileName = "", std::ostream* so = 0x0, bool const cout = true);
     void ListGather (std::string const& OutFileName = "");
     void VariableDump (std::string const& V, std::string const& OutFileName, int const First = 0, int const Last = 8191);
     void MakeBackup (std::string const& OutFileName);
