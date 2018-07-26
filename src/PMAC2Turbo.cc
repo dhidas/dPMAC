@@ -236,16 +236,17 @@ void PMAC2Turbo::Terminal ()
 
     if (bs == ".h") {
       std::cout << "Commands:" << std::endl;
-      std::cout << "  .h                           - print help" << std::endl;
-      std::cout << "  .q                           - quit" << std::endl;
-      std::cout << "  .d  [file]                   - Download file to pmac" << std::endl;
-      std::cout << "  .l  [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
-      std::cout << "  .g  [file]                   - Upload gather buffer from pmac to file" << std::endl;
-      std::cout << "  .b  [file]                   - Upload backup CFG from pmac to file" << std::endl;
-      std::cout << "  .iv [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .pv [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .qv [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .mv [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .h                              - print help" << std::endl;
+      std::cout << "  .q                              - quit" << std::endl;
+      std::cout << "  .d     [file]                   - Download file to pmac" << std::endl;
+      std::cout << "  .l     [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
+      std::cout << "  .g     [file]                   - Upload gather buffer from pmac to file" << std::endl;
+      std::cout << "  .b     [file]                   - Upload backup CFG from pmac to file" << std::endl;
+      std::cout << "  .iv    [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .pv    [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .qv    [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mv    [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mvdef [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
@@ -316,7 +317,11 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         std::cout << "first: " << first << "  last: " << last << std::endl;
         l() && fL << "first: " << first << "  last: " << last << std::endl;
-        this->VariableDump("M", fn, first, last);
+        if (bs.find(".mvdef") != std::string::npos) {
+          this->MVariableDefinitionDump(fn, first, last);
+        } else {
+          this->VariableDump("M", fn, first, last);
+        }
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -902,6 +907,42 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
 
 
 
+void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int const First, int const Last)
+{
+  // Check if socket at least defined
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Trying to MVariableDefinitionDump but socket not created" << std::endl;
+    return;
+  }
+
+  // Open file for writing
+  std::ofstream fo(OutFileName);
+  if (!fo.is_open()) {
+    std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+    l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
+  }
+
+  char command[20];
+  std::string response = "";
+  for (int i = First; i < Last; ++i) {
+    sprintf(command, "M%04i->", i);
+    response = this->GetResponseString(command);
+    std::cout << command << response << std::endl;
+    l() && fL << command << response << std::endl;
+    if (fo.is_open()) {
+      fo << command << "=" << response << std::endl;
+    }
+  }
+
+  fo.close();
+  return;
+}
+
+
+
+
+
+
 void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 {
   // Check if socket at least defined
@@ -926,8 +967,10 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 
   int const First = 0;
   int const Last  = 8191;
+  char command[100];
 
 
+  /*
 
   std::cout << "Uploading I Variables" << std::endl;
   l() && fL << "Uploading I Variables" << std::endl;
@@ -996,10 +1039,11 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   oss.str("");
   for (int i = First; i <= Last; ++i) {
     iss >> s;
-    fo << "M" << i << "=" << s << std::endl;
+    fo << "M" << i << "->" << s << std::endl;
   }
 
 
+  */
 
   std::cout << "Uploading PLCs" << std::endl;
   l() && fL << "Uploading PLCs" << std::endl;
@@ -1007,7 +1051,6 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   fo << ";;;;;;;;;;" << std::endl;
   fo << ";; PLCs ;;" << std::endl;
   fo << ";;;;;;;;;;" << std::endl << std::endl;
-  char command[100];
   for (int i = 0; i != 32; ++i) {
     sprintf(command, "LIST PLC %i", i);
 
@@ -1042,14 +1085,38 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
     this->SendLine(command);
     this->Flush();
 
+    std::string mystr = "";
+    size_t pos_ret = std::string::npos;
+
     for (int im = 1; im <= 32; ++im) {
-      sprintf(command, "#%i->", i);
+      sprintf(command, "#%i->", im);
       this->SendLine(command);
 
       this->GetBuffer("", &oss, false);
       fo << "#" << im << "->" << oss.str();
       oss.str("");
     }
+
+    this->SendLine("list forward");
+    this->GetBuffer("", &oss, false);
+    mystr = oss.str();
+    oss.str("");
+    pos_ret = mystr.find("RET");
+    if (pos_ret != std::string::npos) {
+      mystr.replace(pos_ret, 3, "CLOSE");
+      fo << "OPEN FORWARD CLEAR\n" << mystr << std::endl;
+    }
+
+    this->SendLine("list inverse");
+    this->GetBuffer("", &oss, false);
+    mystr = oss.str();
+    oss.str("");
+    pos_ret = mystr.find("RET");
+    if (pos_ret != std::string::npos) {
+      mystr.replace(pos_ret, 3, "CLOSE");
+      fo << "OPEN INVERSE CLEAR\n" << mystr << std::endl;
+    }
+
     fo << std::endl;
   }
 
