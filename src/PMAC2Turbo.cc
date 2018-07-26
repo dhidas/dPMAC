@@ -203,7 +203,19 @@ void PMAC2Turbo::Save ()
 
 
 
-const char *words[] = {"add", "remove", "rm", "update", "child", "children", "wife", "wives"};
+const char *words[] = {
+".help",
+".quit",
+".download",
+".logging",
+".gather",
+".backup",
+".ivars",
+".pvars",
+".qvars",
+".mvars",
+".mdefs"
+};
 
 // Generator function for word completion.
 char *my_generator (const char *text, int state)
@@ -282,26 +294,26 @@ void PMAC2Turbo::Terminal ()
       bs = std::string(bs.begin() + first_nws, bs.end());
     }
 
-    if (bs == ".h") {
+    if (bs == ".help") {
       std::cout << "Commands:" << std::endl;
-      std::cout << "  .h                              - print help" << std::endl;
-      std::cout << "  .q                              - quit" << std::endl;
-      std::cout << "  .d     [file]                   - Download file to pmac" << std::endl;
-      std::cout << "  .l     [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
-      std::cout << "  .g     [file]                   - Upload gather buffer from pmac to file" << std::endl;
-      std::cout << "  .b     [file]                   - Upload backup CFG from pmac to file" << std::endl;
-      std::cout << "  .ivars [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .pvars [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .qvars [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .mvars [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .mdefs [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
+      std::cout << "  .help                              - print help" << std::endl;
+      std::cout << "  .quit                              - quit" << std::endl;
+      std::cout << "  .download [file]                   - Download file to pmac" << std::endl;
+      std::cout << "  .logging  [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
+      std::cout << "  .gather   [file]                   - Upload gather buffer from pmac to file" << std::endl;
+      std::cout << "  .backup   [file]                   - Upload backup CFG from pmac to file" << std::endl;
+      std::cout << "  .ivars    [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .pvars    [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .qvars    [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mvars    [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mdefs    [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
       this->FactoryReset();
     } else if (bs == "save") {
       this->Save();
-    } else if (bs.find(".iv") == 0) {
+    } else if (bs.find(".ivars") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
@@ -318,7 +330,7 @@ void PMAC2Turbo::Terminal ()
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
-    } else if (bs.find(".pv") == 0) {
+    } else if (bs.find(".pvars") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
@@ -335,7 +347,7 @@ void PMAC2Turbo::Terminal ()
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
-    } else if (bs.find(".qv") == 0) {
+    } else if (bs.find(".qvars") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
@@ -352,7 +364,7 @@ void PMAC2Turbo::Terminal ()
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
-    } else if (bs.find(".mv") == 0) {
+    } else if (bs.find(".mvars") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
@@ -363,23 +375,32 @@ void PMAC2Turbo::Terminal ()
       ss >> first;
       ss >> last;
       if (fn.size() > 0) {
-        std::cout << "first: " << first << "  last: " << last << std::endl;
-        l() && fL << "first: " << first << "  last: " << last << std::endl;
-        if (bs.find(".mvdef") != std::string::npos) {
-          this->MVariableDefinitionDump(fn, first, last);
-        } else {
-          this->VariableDump("M", fn, first, last);
-        }
+        this->VariableDump("M", fn, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
-    } else if (bs.find(".q") == 0) {
+    } else if (bs.find(".mdefs") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 8191;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        this->MVariableDefinitionDump(fn, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
+    } else if (bs.find(".quit") == 0) {
       if (l()) {
         this->StopLog();
       }
       free(buf);
       return;
-    } else if (bs.find(".l") == 0) {
+    } else if (bs.find(".logging") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
@@ -390,7 +411,7 @@ void PMAC2Turbo::Terminal ()
       } else {
         this->StopLog();
       }
-    } else if (bs.find(".d") == 0) {
+    } else if (bs.find(".download") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
@@ -399,9 +420,9 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         this->DownloadFile(fn);
       } else {
-        std::cout << "Usage: .d [file]" << std::endl;
+        std::cout << "Usage: .download [file]" << std::endl;
       }
-    } else if (bs.find(".g") == 0) {
+    } else if (bs.find(".gather") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
@@ -410,9 +431,9 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         this->ListGather(fn);
       } else {
-        std::cout << "Usage: .g [file]" << std::endl;
+        std::cout << "Usage: .gather [file]" << std::endl;
       }
-    } else if (bs.find(".b") == 0) {
+    } else if (bs.find(".backup") == 0) {
       std::istringstream ss(bs);
       std::string fn;
       ss >> fn;
@@ -936,7 +957,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
 
   char command[20];
   std::string response = "";
-  for (int i = First; i < Last; ++i) {
+  for (int i = First; i <= Last; ++i) {
     sprintf(command, "%s%04i", V.c_str(), i);
     response = this->GetResponseString(command);
     std::cout << command << "=" << response << std::endl;
@@ -972,7 +993,7 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int co
 
   char command[20];
   std::string response = "";
-  for (int i = First; i < Last; ++i) {
+  for (int i = First; i <= Last; ++i) {
     sprintf(command, "M%04i->", i);
     response = this->GetResponseString(command);
     std::cout << command << response << std::endl;
