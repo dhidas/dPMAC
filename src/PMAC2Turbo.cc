@@ -203,6 +203,48 @@ void PMAC2Turbo::Save ()
 
 
 
+const char *words[] = {"add", "remove", "rm", "update", "child", "children", "wife", "wives"};
+
+// Generator function for word completion.
+char *my_generator (const char *text, int state)
+{
+    static int list_index, len;
+    const char *name;
+
+    if (!state)
+    {
+        list_index = 0;
+        len = strlen (text);
+    }
+
+    while (name = words[list_index])
+    {
+        list_index++;
+        if (strncmp (name, text, len) == 0) return strdup (name);
+    }
+
+    // If no names matched, then return NULL.
+    return ((char *) NULL);
+}
+
+
+// Custom completion function
+static char **my_completion (const char *text, int start, int end)
+{
+    // This prevents appending space to the end of the matching word
+    rl_completion_append_character = '\0';
+
+    char **matches = (char **) NULL;
+    if (start == 0)
+    {
+        matches = rl_completion_matches ((char *) text, &my_generator);
+    }
+    // else rl_bind_key ('\t', rl_abort);
+    return matches;
+}
+
+
+
 
 
 
@@ -217,6 +259,8 @@ void PMAC2Turbo::Terminal ()
   rl_bind_key (CTRLK, rl_insert);
   //rl_bind_key (CTRLK, static_cast<PMAC2Turbo*>(this)->SendCTRLK);
   rl_bind_key (CTRLD, rl_insert);
+
+    rl_attempted_completion_function = my_completion;
 
 
   bool Logging = false;
@@ -246,11 +290,11 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .l     [file]                   - logging (without [file] is to stop, with will log to file" << std::endl;
       std::cout << "  .g     [file]                   - Upload gather buffer from pmac to file" << std::endl;
       std::cout << "  .b     [file]                   - Upload backup CFG from pmac to file" << std::endl;
-      std::cout << "  .iv    [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .pv    [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .qv    [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .mv    [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
-      std::cout << "  .mvdef [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
+      std::cout << "  .ivars [file] [start] [stop]    - dump I variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .pvars [file] [start] [stop]    - dump P variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .qvars [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mvars [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
+      std::cout << "  .mdefs [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
