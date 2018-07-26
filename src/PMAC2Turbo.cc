@@ -101,6 +101,10 @@ void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
     return;
   }
 
+  // To establish correct communication protocol
+  this->SendLine("I3=2");
+  this->Flush();
+
   return;
 }
 
@@ -970,7 +974,6 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   char command[100];
 
 
-  /*
 
   std::cout << "Uploading I Variables" << std::endl;
   l() && fL << "Uploading I Variables" << std::endl;
@@ -1043,7 +1046,6 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   }
 
 
-  */
 
   std::cout << "Uploading PLCs" << std::endl;
   l() && fL << "Uploading PLCs" << std::endl;
@@ -1070,11 +1072,12 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 
 
 
-  std::cout << "Uploading COORDINATE SYSTEMS" << std::endl;
-  l() && fL << "Uploading COORDINATE SYSTEMS" << std::endl;
+  std::cout << "Uploading COORDINATE SYSTEMS and kinematics" << std::endl;
+  l() && fL << "Uploading COORDINATE SYSTEMS and kinematics" << std::endl;
 
   fo << ";;;;;;;;;;;;;;;;;;;;;;;;" << std::endl;
   fo << ";; COORDINATE SYSTEMS ;;" << std::endl;
+  fo << ";;   and kinematics   ;;" << std::endl;
   fo << ";;;;;;;;;;;;;;;;;;;;;;;;" << std::endl << std::endl;
 
   fo << "UNDEFINE ALL" << std::endl;
