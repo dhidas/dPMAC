@@ -532,10 +532,6 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
   if (IP == "") {
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
   } else {
-    //strncpy((char*) &fEthCmd.bData[0], (char*) &ip[0], 1);
-    //strncpy((char*) &fEthCmd.bData[1], (char*) &ip[1], 1);
-    //strncpy((char*) &fEthCmd.bData[2], (char*) &ip[2], 1);
-    //strncpy((char*) &fEthCmd.bData[3], (char*) &ip[3], 1);
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + 4, 0);
   }
   recv(fSocket, (char*) &fData, 4, 0);

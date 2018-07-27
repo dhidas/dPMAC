@@ -12,12 +12,10 @@
 #include "PMAC2Turbo.h"
 
 
-int PMACTerminal ()
+int dpterm (std::string const& IP, int const PORT = 1025)
 {
-  std::string const IP = "192.168.1.103";
 
-  PMAC2Turbo PMAC(IP);
-
+  PMAC2Turbo PMAC(IP, PORT);
   PMAC.Terminal();
 
   return 0;
@@ -26,12 +24,16 @@ int PMACTerminal ()
 
 int main (int argc, char* argv[])
 {
-  if (argc != 1) {
-    std::cerr << "Usage: " << argv[0] << " " << std::endl;
+  if (argc != 2 && argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " [IP] [PORT]" << std::endl;
     return 1;
   }
 
-  PMACTerminal();
+  if (argc == 2) {
+    dpterm(argv[1]);
+  } else {
+    dpterm(argv[1], atoi(argv[2]));
+  }
 
   return 0;
 }
