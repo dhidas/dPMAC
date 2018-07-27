@@ -982,7 +982,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
 
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
-  if (OutFileName == "") {
+  if (OutFileName != "") {
     fo = new std::ofstream(OutFileName);
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
@@ -999,7 +999,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
   std::istringstream iss;
   std::string s;
 
-  sprintf(command, "s%i..%i", V.c_str(), First, Last);
+  sprintf(command, "%s%i..%i", V.c_str(), First, Last);
 
   this->SendLine(command);
   this->GetBuffer("", &oss, false);
@@ -1033,7 +1033,7 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::o
 
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
-  if (OutFileName == "") {
+  if (OutFileName != "") {
     fo = new std::ofstream(OutFileName);
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
@@ -1084,7 +1084,7 @@ void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int 
 
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
-  if (OutFileName == "") {
+  if (OutFileName != "") {
     fo = new std::ofstream(OutFileName);
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
