@@ -1011,6 +1011,42 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int co
 
 
 
+void PMAC2Turbo::PLCDump (std::ostream* os)
+{
+  // Dump PLCs to file or stream
+
+  char command[100];
+  std::ostringstream oss;
+
+  std::cout << "Uploading PLCs" << std::endl;
+  l() && fL << "Uploading PLCs" << std::endl;
+
+  *os << ";;;;;;;;;;" << std::endl;
+  *os << ";; PLCs ;;" << std::endl;
+  *os << ";;;;;;;;;;" << std::endl << std::endl;
+  for (int i = 0; i != 32; ++i) {
+    sprintf(command, "LIST PLC %i", i);
+
+    this->SendLine(command);
+    this->GetBuffer("", &oss, false);
+    std::string mystr = oss.str();
+    oss.str("");
+    if (mystr.size() > 0) {
+      size_t pos_ret = mystr.find("RET");
+      if (pos_ret != std::string::npos) {
+        mystr.replace(pos_ret, 3, "CLOSE");
+      }
+      *os << "OPEN PLC " << i << " CLEAR" << std::endl;
+      *os << mystr << std::endl;;
+    }
+  }
+
+  return;
+}
+
+
+
+
 
 void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 {
@@ -1112,28 +1148,30 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 
 
 
-  std::cout << "Uploading PLCs" << std::endl;
-  l() && fL << "Uploading PLCs" << std::endl;
+  //std::cout << "Uploading PLCs" << std::endl;
+  //l() && fL << "Uploading PLCs" << std::endl;
 
-  fo << ";;;;;;;;;;" << std::endl;
-  fo << ";; PLCs ;;" << std::endl;
-  fo << ";;;;;;;;;;" << std::endl << std::endl;
-  for (int i = 0; i != 32; ++i) {
-    sprintf(command, "LIST PLC %i", i);
+  //fo << ";;;;;;;;;;" << std::endl;
+  //fo << ";; PLCs ;;" << std::endl;
+  //fo << ";;;;;;;;;;" << std::endl << std::endl;
+  //for (int i = 0; i != 32; ++i) {
+  //  sprintf(command, "LIST PLC %i", i);
 
-    this->SendLine(command);
-    this->GetBuffer("", &oss, false);
-    std::string mystr = oss.str();
-    oss.str("");
-    if (mystr.size() > 0) {
-      size_t pos_ret = mystr.find("RET");
-      if (pos_ret != std::string::npos) {
-        mystr.replace(pos_ret, 3, "CLOSE");
-      }
-      fo << "OPEN PLC " << i << " CLEAR" << std::endl;
-      fo << mystr << std::endl;;
-    }
-  }
+  //  this->SendLine(command);
+  //  this->GetBuffer("", &oss, false);
+  //  std::string mystr = oss.str();
+  //  oss.str("");
+  //  if (mystr.size() > 0) {
+  //    size_t pos_ret = mystr.find("RET");
+  //    if (pos_ret != std::string::npos) {
+  //      mystr.replace(pos_ret, 3, "CLOSE");
+  //    }
+  //    fo << "OPEN PLC " << i << " CLEAR" << std::endl;
+  //    fo << mystr << std::endl;;
+  //  }
+  //}
+
+  this->PLCDump(&fo);
 
 
 

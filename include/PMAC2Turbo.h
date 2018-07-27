@@ -102,6 +102,7 @@ class PMAC2Turbo
     void ListGather (std::string const& OutFileName = "");
     void VariableDump (std::string const& V, std::string const& OutFileName, int const First = 0, int const Last = 8191);
     void MVariableDefinitionDump (std::string const& OutFileName, int const First = 0, int const Last = 8191);
+    void PLCDump (std::ostream* os);
     void MakeBackup (std::string const& OutFileName);
 
     std::string ReplaceDefinesInString (std::string const& InString);
