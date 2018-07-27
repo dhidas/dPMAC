@@ -333,7 +333,7 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         std::cout << "first: " << first << "  last: " << last << std::endl;
         l() && fL << "first: " << first << "  last: " << last << std::endl;
-        this->VariableDump("I", fn, first, last);
+        this->VariableDump("I", fn, 0x0, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -350,7 +350,7 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         std::cout << "first: " << first << "  last: " << last << std::endl;
         l() && fL << "first: " << first << "  last: " << last << std::endl;
-        this->VariableDump("P", fn, first, last);
+        this->VariableDump("P", fn, 0x0, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -367,7 +367,7 @@ void PMAC2Turbo::Terminal ()
       if (fn.size() > 0) {
         std::cout << "first: " << first << "  last: " << last << std::endl;
         l() && fL << "first: " << first << "  last: " << last << std::endl;
-        this->VariableDump("Q", fn, first, last);
+        this->VariableDump("Q", fn, 0x0, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -382,7 +382,7 @@ void PMAC2Turbo::Terminal ()
       ss >> first;
       ss >> last;
       if (fn.size() > 0) {
-        this->VariableDump("M", fn, first, last);
+        this->VariableDump("M", fn, 0x0, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -397,7 +397,7 @@ void PMAC2Turbo::Terminal ()
       ss >> first;
       ss >> last;
       if (fn.size() > 0) {
-        this->MVariableDefinitionDump(fn, first, last);
+        this->MVariableDefinitionDump(fn, 0x0, first, last);
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -970,34 +970,50 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
 
 
 
-void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileName, int const First, int const Last)
+void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileName, std::ostream* os, int const First, int const Last)
 {
-  // Check if socket at least defined
-  if (fSocket < 0) {
-    std::cerr << "ERROR: Trying to VariableDump but socket not created" << std::endl;
+  // Dump MVariable definitions to file or stream
+
+  // Chekc at least one exists
+  if (os == 0x0 && OutFileName == "") {
+    std::cerr << "ERROR: neither output stream nor file specified" << std::endl;
     return;
   }
 
-  // Open file for writing
-  std::ofstream fo(OutFileName);
-  if (!fo.is_open()) {
-    std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
-    l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
-  }
-
-  char command[20];
-  std::string response = "";
-  for (int i = First; i <= Last; ++i) {
-    sprintf(command, "%s%i", V.c_str(), i);
-    response = this->GetResponseString(command);
-    std::cout << command << "=" << response << std::endl;
-    l() && fL << command << "=" << response << std::endl;
-    if (fo.is_open()) {
-      fo << command << "=" << response << std::endl;
+  // Check if filename exists and use it for output if so
+  std::ofstream* fo = 0x0;
+  if (OutFileName == "") {
+    fo = new std::ofstream(OutFileName);
+    if (!fo->is_open()) {
+      std::cerr << "ERROR: cannot open file" << std::endl;
+      return;
     }
   }
 
-  fo.close();
+  if (fo != 0x0) {
+    os = (std::ostream*) fo;
+  }
+
+  char command[100];
+  std::ostringstream oss;
+  std::istringstream iss;
+  std::string s;
+
+  sprintf(command, "s%i..%i", V.c_str(), First, Last);
+
+  this->SendLine(command);
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    *os << V << i << "=" << s << std::endl;
+  }
+
+  if (fo != 0x0) {
+    fo->close();
+  }
+
   return;
 }
 
@@ -1005,35 +1021,50 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
 
 
 
-
-void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int const First, int const Last)
+void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::ostream* os, int const First, int const Last)
 {
-  // Check if socket at least defined
-  if (fSocket < 0) {
-    std::cerr << "ERROR: Trying to MVariableDefinitionDump but socket not created" << std::endl;
+  // Dump MVariable definitions to file or stream
+
+  // Chekc at least one exists
+  if (os == 0x0 && OutFileName == "") {
+    std::cerr << "ERROR: neither output stream nor file specified" << std::endl;
     return;
   }
 
-  // Open file for writing
-  std::ofstream fo(OutFileName);
-  if (!fo.is_open()) {
-    std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
-    l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
-  }
-
-  char command[20];
-  std::string response = "";
-  for (int i = First; i <= Last; ++i) {
-    sprintf(command, "M%i->", i);
-    response = this->GetResponseString(command);
-    std::cout << command << response << std::endl;
-    l() && fL << command << response << std::endl;
-    if (fo.is_open()) {
-      fo << command << "=" << response << std::endl;
+  // Check if filename exists and use it for output if so
+  std::ofstream* fo = 0x0;
+  if (OutFileName == "") {
+    fo = new std::ofstream(OutFileName);
+    if (!fo->is_open()) {
+      std::cerr << "ERROR: cannot open file" << std::endl;
+      return;
     }
   }
 
-  fo.close();
+  if (fo != 0x0) {
+    os = (std::ostream*) fo;
+  }
+
+  char command[100];
+  std::ostringstream oss;
+  std::istringstream iss;
+  std::string s;
+
+  sprintf(command, "M%i..%i->", First, Last);
+
+  this->SendLine(command);
+  this->GetBuffer("", &oss, false);
+  iss.str(oss.str());
+  oss.str("");
+  for (int i = First; i <= Last; ++i) {
+    iss >> s;
+    *os << "M" << i << "->" << s << std::endl;
+  }
+
+  if (fo != 0x0) {
+    fo->close();
+  }
+
   return;
 }
 
@@ -1068,12 +1099,6 @@ void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int 
   char command[100];
   std::ostringstream oss;
 
-  std::cout << "Uploading PLCs" << std::endl;
-  l() && fL << "Uploading PLCs" << std::endl;
-
-  *os << ";;;;;;;;;;" << std::endl;
-  *os << ";; PLCs ;;" << std::endl;
-  *os << ";;;;;;;;;;" << std::endl << std::endl;
   for (int i = First; i <= Last; ++i) {
     sprintf(command, "LIST PLC %i", i);
 
@@ -1137,14 +1162,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   fo << ";; I-Variables ;;" << std::endl;
   fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
 
-  this->SendLine("I0..8191");
-  this->GetBuffer("", &oss, false);
-  iss.str(oss.str());
-  oss.str("");
-  for (int i = First; i <= Last; ++i) {
-    iss >> s;
-    fo << "I" << i << "=" << s << std::endl;
-  }
+  this->VariableDump("I", "", &fo);
 
 
 
@@ -1155,14 +1173,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   fo << ";; P-Variables ;;" << std::endl;
   fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
 
-  this->SendLine("P0..8191");
-  this->GetBuffer("", &oss, false);
-  iss.str(oss.str());
-  oss.str("");
-  for (int i = First; i <= Last; ++i) {
-    iss >> s;
-    fo << "P" << i << "=" << s << std::endl;
-  }
+  this->VariableDump("P", "", &fo);
 
 
 
@@ -1173,14 +1184,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   fo << ";; Q-Variables ;;" << std::endl;
   fo << ";;;;;;;;;;;;;;;;;" << std::endl << std::endl;
 
-  this->SendLine("Q0..8191");
-  this->GetBuffer("", &oss, false);
-  iss.str(oss.str());
-  oss.str("");
-  for (int i = First; i <= Last; ++i) {
-    iss >> s;
-    fo << "Q" << i << "=" << s << std::endl;
-  }
+  this->VariableDump("Q", "", &fo);
 
 
 
@@ -1191,39 +1195,16 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   fo << ";; M-Variable Definitions ;;" << std::endl;
   fo << ";;;;;;;;;;;;;;;;;;;;;;;;;;;;" << std::endl << std::endl;
 
-  this->SendLine("M0..8191->");
-  this->GetBuffer("", &oss, false);
-  iss.str(oss.str());
-  oss.str("");
-  for (int i = First; i <= Last; ++i) {
-    iss >> s;
-    fo << "M" << i << "->" << s << std::endl;
-  }
+  this->MVariableDefinitionDump("", &fo);
 
 
 
-  //std::cout << "Uploading PLCs" << std::endl;
-  //l() && fL << "Uploading PLCs" << std::endl;
+  std::cout << "Uploading PLCs" << std::endl;
+  l() && fL << "Uploading PLCs" << std::endl;
 
-  //fo << ";;;;;;;;;;" << std::endl;
-  //fo << ";; PLCs ;;" << std::endl;
-  //fo << ";;;;;;;;;;" << std::endl << std::endl;
-  //for (int i = 0; i != 32; ++i) {
-  //  sprintf(command, "LIST PLC %i", i);
-
-  //  this->SendLine(command);
-  //  this->GetBuffer("", &oss, false);
-  //  std::string mystr = oss.str();
-  //  oss.str("");
-  //  if (mystr.size() > 0) {
-  //    size_t pos_ret = mystr.find("RET");
-  //    if (pos_ret != std::string::npos) {
-  //      mystr.replace(pos_ret, 3, "CLOSE");
-  //    }
-  //    fo << "OPEN PLC " << i << " CLEAR" << std::endl;
-  //    fo << mystr << std::endl;;
-  //  }
-  //}
+  fo << ";;;;;;;;;;" << std::endl;
+  fo << ";; PLCs ;;" << std::endl;
+  fo << ";;;;;;;;;;" << std::endl << std::endl;
 
   this->PLCDump("", &fo);
 

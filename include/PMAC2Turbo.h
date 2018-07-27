@@ -100,8 +100,8 @@ class PMAC2Turbo
     std::string GetResponseString (std::string const& Line);
     void GetBuffer (std::string const& OutFileName = "", std::ostream* so = 0x0, bool const cout = true);
     void ListGather (std::string const& OutFileName = "");
-    void VariableDump (std::string const& V, std::string const& OutFileName, int const First = 0, int const Last = 8191);
-    void MVariableDefinitionDump (std::string const& OutFileName, int const First = 0, int const Last = 8191);
+    void VariableDump (std::string const& V, std::string const& OutFileName, std::ostream* os, int const First = 0, int const Last = 8191);
+    void MVariableDefinitionDump (std::string const& OutFileName = "", std::ostream* os = 0x0, int const First = 0, int const Last = 8191);
     void PLCDump (std::string const& OutFileName = "", std::ostream* os = 0x0, int const First = 0, int const Last = 31);
     void MakeBackup (std::string const& OutFileName);
 
