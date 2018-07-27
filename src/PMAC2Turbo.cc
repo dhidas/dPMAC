@@ -307,6 +307,7 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .qvars    [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
       std::cout << "  .mvars    [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
       std::cout << "  .mdefs    [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
+      std::cout << "  .ip       [addr]                   - get ip, or set if [addr] is given" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
@@ -445,10 +446,24 @@ void PMAC2Turbo::Terminal ()
         std::cout << "saving to backup.CFG" << std::endl;
         this->MakeBackup("backup.CFG");
       }
+    } else if (bs.find(".ip") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      if (fn.size() > 0) {
+        this->IPAddress(fn);
+      } else {
+        this->IPAddress();
+      }
     } else {
       this->SendLine(buf);
       this->GetBuffer();
     }
+
+
+
 
     if (Logging && LogFileName != "" && !LogFile.is_open()) {
       LogFile.open(LogFileName);
@@ -498,6 +513,13 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
 {
   // Get or set the IP address
 
+  sscanf(IP.c_str(), "%hu.%hu.%hu.%hu", 
+      (unsigned short*) &fEthCmd.bData[0],
+      (unsigned short*) &fEthCmd.bData[1],
+      (unsigned short*) &fEthCmd.bData[2],
+      (unsigned short*) &fEthCmd.bData[3]
+      );
+
   if (IP == "") {
     fEthCmd.RequestType = VR_UPLOAD;
   } else {
@@ -507,9 +529,15 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
   fEthCmd.wValue      = 0;
   fEthCmd.wIndex      = 0;
   fEthCmd.wLength     = htons(4);
-  //strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
-  //send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
-  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  if (IP == "") {
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  } else {
+    //strncpy((char*) &fEthCmd.bData[0], (char*) &ip[0], 1);
+    //strncpy((char*) &fEthCmd.bData[1], (char*) &ip[1], 1);
+    //strncpy((char*) &fEthCmd.bData[2], (char*) &ip[2], 1);
+    //strncpy((char*) &fEthCmd.bData[3], (char*) &ip[3], 1);
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + 4, 0);
+  }
   recv(fSocket, (char*) &fData, 4, 0);
 
   if (IP == "") {
@@ -958,7 +986,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
   char command[20];
   std::string response = "";
   for (int i = First; i <= Last; ++i) {
-    sprintf(command, "%s%04i", V.c_str(), i);
+    sprintf(command, "%s%i", V.c_str(), i);
     response = this->GetResponseString(command);
     std::cout << command << "=" << response << std::endl;
     l() && fL << command << "=" << response << std::endl;
@@ -994,7 +1022,7 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int co
   char command[20];
   std::string response = "";
   for (int i = First; i <= Last; ++i) {
-    sprintf(command, "M%04i->", i);
+    sprintf(command, "M%i->", i);
     response = this->GetResponseString(command);
     std::cout << command << response << std::endl;
     l() && fL << command << response << std::endl;
@@ -1011,9 +1039,29 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, int co
 
 
 
-void PMAC2Turbo::PLCDump (std::ostream* os)
+void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int const First, int const Last)
 {
   // Dump PLCs to file or stream
+
+  // Chekc at least one exists
+  if (os == 0x0 && OutFileName == "") {
+    std::cerr << "ERROR: neither output stream nor file specified" << std::endl;
+    return;
+  }
+
+  // Check if filename exists and use it for output if so
+  std::ofstream* fo = 0x0;
+  if (OutFileName == "") {
+    fo = new std::ofstream(OutFileName);
+    if (!fo->is_open()) {
+      std::cerr << "ERROR: cannot open file" << std::endl;
+      return;
+    }
+  }
+
+  if (fo != 0x0) {
+    os = (std::ostream*) fo;
+  }
 
   char command[100];
   std::ostringstream oss;
@@ -1024,7 +1072,7 @@ void PMAC2Turbo::PLCDump (std::ostream* os)
   *os << ";;;;;;;;;;" << std::endl;
   *os << ";; PLCs ;;" << std::endl;
   *os << ";;;;;;;;;;" << std::endl << std::endl;
-  for (int i = 0; i != 32; ++i) {
+  for (int i = First; i <= Last; ++i) {
     sprintf(command, "LIST PLC %i", i);
 
     this->SendLine(command);
@@ -1039,6 +1087,10 @@ void PMAC2Turbo::PLCDump (std::ostream* os)
       *os << "OPEN PLC " << i << " CLEAR" << std::endl;
       *os << mystr << std::endl;;
     }
+  }
+
+  if (fo != 0x0) {
+    fo->close();
   }
 
   return;
@@ -1171,7 +1223,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   //  }
   //}
 
-  this->PLCDump(&fo);
+  this->PLCDump("", &fo);
 
 
 
