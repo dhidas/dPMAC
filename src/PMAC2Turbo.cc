@@ -203,7 +203,8 @@ void PMAC2Turbo::Save ()
 
 
 
-const char *words[] = {
+#define NWORDS 11
+const char *words[NWORDS] = {
 ".help",
 ".quit",
 ".download",
@@ -220,6 +221,7 @@ const char *words[] = {
 // Generator function for word completion.
 char *my_generator (const char *text, int state)
 {
+
     static int list_index, len;
     const char *name;
 
@@ -229,10 +231,14 @@ char *my_generator (const char *text, int state)
         len = strlen (text);
     }
 
-    while (name = words[list_index])
+    while (list_index < NWORDS)
     {
+      name = words[list_index];
+
         list_index++;
-        if (strncmp (name, text, len) == 0) return strdup (name);
+        if (strncmp (name, text, len) == 0) {
+          return strdup (name);
+        }
     }
 
     // If no names matched, then return NULL.
