@@ -222,43 +222,41 @@ const char *words[NWORDS] = {
 char *my_generator (const char *text, int state)
 {
 
-    static int list_index, len;
-    const char *name;
+  static int list_index, len;
+  const char *name;
 
-    if (!state)
-    {
-        list_index = 0;
-        len = strlen (text);
+  if (!state) {
+    list_index = 0;
+    len = strlen (text);
+  }
+
+  while (list_index < NWORDS) {
+    name = words[list_index];
+
+    list_index++;
+    if (strncmp (name, text, len) == 0) {
+      return strdup (name);
     }
+  }
 
-    while (list_index < NWORDS)
-    {
-      name = words[list_index];
-
-        list_index++;
-        if (strncmp (name, text, len) == 0) {
-          return strdup (name);
-        }
-    }
-
-    // If no names matched, then return NULL.
-    return ((char *) NULL);
+  // If no names matched, then return NULL.
+  return ((char *) NULL);
 }
 
 
 // Custom completion function
 static char **my_completion (const char *text, int start, int end)
 {
-    // This prevents appending space to the end of the matching word
-    rl_completion_append_character = '\0';
+  // This prevents appending space to the end of the matching word
+  rl_completion_append_character = '\0';
 
-    char **matches = (char **) NULL;
-    if (start == 0)
-    {
-        matches = rl_completion_matches ((char *) text, &my_generator);
-    }
-    // else rl_bind_key ('\t', rl_abort);
-    return matches;
+  char **matches = (char **) NULL;
+  if (start == 0) {
+    matches = rl_completion_matches ((char *) text, &my_generator);
+  }
+
+  // else rl_bind_key ('\t', rl_abort);
+  return matches;
 }
 
 
