@@ -72,6 +72,20 @@ void PMAC2Turbo::ReConnect ()
 
 
 
+bool PMAC2Turbo::Check ()
+{
+  if (fSocket < 0) {
+    std::cerr << "ERROR: Cannot create socket" << std::endl;
+    l() && fL << "ERROR: Cannot create socket" << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+
+
+
 void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
 {
   // Store IP and PORT
@@ -158,6 +172,12 @@ void PMAC2Turbo::StopLog ()
 void PMAC2Turbo::Reset()
 {
   // Send $$$ to the controller, pause, and flush
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
+
   this->SendLine("$$$");
   sleep(2);
   this->Flush();
@@ -171,6 +191,12 @@ void PMAC2Turbo::Reset()
 void PMAC2Turbo::FactoryReset()
 {
   // Send $$$ to the controller, pause, and flush
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
+
   this->SendLine("$$$***");
   sleep(2);
   this->Flush();
@@ -190,6 +216,12 @@ void PMAC2Turbo::FactoryReset()
 void PMAC2Turbo::Save ()
 {
   // Send $$$ to the controller, pause, and flush
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
+
   std::cout << "saving" << std::endl;
   l() && fL << "saving" << std::endl;
   this->SendLine("save");
@@ -276,7 +308,7 @@ void PMAC2Turbo::Terminal ()
   //rl_bind_key (CTRLK, static_cast<PMAC2Turbo*>(this)->SendCTRLK);
   rl_bind_key (CTRLD, rl_insert);
 
-    rl_attempted_completion_function = my_completion;
+  rl_attempted_completion_function = my_completion;
 
 
   bool Logging = false;
@@ -462,11 +494,12 @@ void PMAC2Turbo::Terminal ()
         this->IPAddress();
       }
     } else {
-      this->SendLine(buf);
-      this->GetBuffer();
+      // Check if socket at least defined
+      if (this->Check()) {
+        this->SendLine(buf);
+        this->GetBuffer();
+      }
     }
-
-
 
 
     if (Logging && LogFileName != "" && !LogFile.is_open()) {
@@ -483,6 +516,7 @@ void PMAC2Turbo::Terminal ()
   }
 
 
+  std::cout << "leaving terminal" << std::endl;
   return;
 }
 
@@ -490,9 +524,14 @@ void PMAC2Turbo::Terminal ()
 
 
 
-void PMAC2Turbo::Flush ()
+bool PMAC2Turbo::Flush ()
 {
   // Flush the data buffer in PMAC
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return false;
+  }
 
   // First flush any data in the buffer
   fEthCmd.RequestType = VR_DOWNLOAD;
@@ -504,9 +543,10 @@ void PMAC2Turbo::Flush ()
   recv(fSocket, (char*) &fData, 1, 0);
   if (fData[0] != VR_DOWNLOAD) {
     std::cerr << "ERROR: flush failed" << std::endl;
+    return false;
   }
 
-  return;
+  return true;
 }
 
 
@@ -516,6 +556,11 @@ void PMAC2Turbo::Flush ()
 void PMAC2Turbo::IPAddress (std::string const& IP)
 {
   // Get or set the IP address
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
 
   sscanf(IP.c_str(), "%hu.%hu.%hu.%hu", 
       (unsigned short*) &fEthCmd.bData[0],
@@ -559,13 +604,12 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
 
 void PMAC2Turbo::SendCTRLK ()
 {
+  // Send a ^K
 
-  //fEthCmd.RequestType = VR_DOWNLOAD;
-  //fEthCmd.Request     = VR_PMAC_SENDCTRLCHAR;
-  //fEthCmd.wValue      = htons(CTRLK);
-  //fEthCmd.wIndex      = 0;
-  //fEthCmd.wLength     = 0;
-  //send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
 
   fEthCmd.RequestType = VR_UPLOAD;
   fEthCmd.Request     = VR_CTRL_RESPONSE;
@@ -586,6 +630,11 @@ void PMAC2Turbo::SendLine (std::string const& Line)
 {
   // Send a command line to PMAC
   
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
+
   fEthCmd.RequestType = VR_DOWNLOAD;
   fEthCmd.Request     = VR_PMAC_SENDLINE;
   fEthCmd.wValue      = 0;
@@ -607,7 +656,12 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   // Returns : Number of errors
   //  -1    : Cannot open file
   //   0    : No errors
- 
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return 1;
+  }
+
   std::cout << "Downloading file: " << InFileName << std::endl;
   l() && fL << "Downloading file: " << InFileName << std::endl;
 
@@ -630,6 +684,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
 
   bool IgnoreInput = false;
+  int NErrors = 0;
 
   // Loop over each line in file
   int i = 0;
@@ -679,7 +734,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
         return 1;
       }
       std::string NewFileName = std::string(key.begin() + 1, key.end() -1);
-      this->DownloadFile(NewFileName);
+      NErrors += this->DownloadFile(NewFileName);
       Line = "";
     }
 
@@ -719,6 +774,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     if (fData[3] == 0x80) {
       std::cerr << "Error at line " << i << " in file " << InFileName << std::endl;
       std::cerr << "  Input was: " << Line << std::endl;
+      ++NErrors;
     }
 
   }
@@ -735,78 +791,15 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
 
 
-void PMAC2Turbo::WriteBuffer (std::string const& Buffer)
-{
-  // Send a command line to PMAC
- 
-  this->Flush();
-
-  bool const EndsWithNULL = Buffer.back() == '\0';
-
-  //std::string::iterator itFrom = Buffer.begin();
-  //std::string::iterator itTo = Buffer.end();
-
-  /*
-  if (Buffer.size() < ToPosition) {
-    fEthCmd.RequestType = VR_DOWNLOAD;
-    fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
-    fEthCmd.wValue      = 0;
-    fEthCmd.wIndex      = 0;
-    fEthCmd.wLength     = htons(Line.size());
-    strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
-    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
-    recv(fSocket, (char*) &fData, 4, 0);
-    int check =  fData[3];
-    std::cout << check << std::endl;
-    if (fData[3] == 0x80) {
-      std::cout << "HELLO ERROR" << std::endl;
-    }
-  }
-
-  while (ToPosition < Buffer.size()) {
-    for ( ; ToPosition > FromPosition; --ToPosition) {
-      if (
-    }
-  }
-
-
-
-  for (std::string Line; std::getline(fi, Line); ) {
-
-    std::cout << Line << std::endl;
-    Line += '\0';
-
-    fEthCmd.RequestType = VR_DOWNLOAD;
-    fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
-    fEthCmd.wValue      = 0;
-    fEthCmd.wIndex      = 0;
-    fEthCmd.wLength     = htons(Line.size());
-    strncpy((char*) &fEthCmd.bData[0], Line.c_str(), Line.size());
-    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
-    recv(fSocket, (char*) &fData, 4, 0);
-    int check =  fData[3];
-    std::cout << check << std::endl;
-    if (fData[3] == 0x80) {
-      std::cout << "HELLO ERROR" << std::endl;
-    }
-    PrintBits(fData[0]);
-    PrintBits(fData[1]);
-    PrintBits(fData[2]);
-    PrintBits(fData[3]);
-  }
-  */
-
-  return;
-}
-
-
 
 
 std::string PMAC2Turbo::GetResponseString (std::string const& Line)
 {
   // Send a command line to PMAC
  
-  this->Flush();
+  if (!this->Flush()) {
+    return "";
+  }
 
   // For the output commands
   fEthCmd.RequestType = VR_DOWNLOAD;
@@ -851,6 +844,11 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open OutFileName: " << OutFileName << std::endl;
     }
+  }
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
   }
 
   // For the output commands
@@ -905,14 +903,6 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
         l() && fL << std::endl;
       }
 
-//      if (fo != 0x0) {
-//        for (int j = 0; j < cr_at; ++j) {
-//          *fo << fData[j];
-//        }
-//        if (!ack_found) {
-//          *fo << std::endl;
-//        }
-//      }
     }
     if (ack_found) {
       break;
@@ -947,8 +937,7 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
 void PMAC2Turbo::ListGather (std::string const& OutFileName)
 {
   // Check if socket at least defined
-  if (fSocket < 0) {
-    std::cerr << "ERROR: Trying to ListGather but socket not created" << std::endl;
+  if (!this->Check()) {
     return;
   }
 
@@ -971,6 +960,11 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
 void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileName, std::ostream* os, int const First, int const Last)
 {
   // Dump MVariable definitions to file or stream
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
 
   // Chekc at least one exists
   if (os == 0x0 && OutFileName == "") {
@@ -1023,6 +1017,11 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::o
 {
   // Dump MVariable definitions to file or stream
 
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
+
   // Chekc at least one exists
   if (os == 0x0 && OutFileName == "") {
     std::cerr << "ERROR: neither output stream nor file specified" << std::endl;
@@ -1073,6 +1072,11 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::o
 void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int const First, int const Last)
 {
   // Dump PLCs to file or stream
+
+  // Check if socket at least defined
+  if (!this->Check()) {
+    return;
+  }
 
   // Chekc at least one exists
   if (os == 0x0 && OutFileName == "") {
@@ -1128,8 +1132,7 @@ void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int 
 void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 {
   // Check if socket at least defined
-  if (fSocket < 0) {
-    std::cerr << "ERROR: Trying to MakeBackup but socket not created" << std::endl;
+  if (!this->Check()) {
     return;
   }
 
@@ -1337,7 +1340,10 @@ void PMAC2Turbo::ClearDefinePairs ()
 void PMAC2Turbo::PrintDefinePairs ()
 {
   for (size_t i = 0; i != fDefinePairs.size(); ++i) {
+    std::cout << fDefinePairs[i].first << "  " << fDefinePairs[i].second << std::endl;
+    l() && fL << fDefinePairs[i].first << "  " << fDefinePairs[i].second << std::endl;
   }
+  return;
 }
 
 

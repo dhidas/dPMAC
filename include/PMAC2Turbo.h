@@ -82,6 +82,7 @@ class PMAC2Turbo
     void Connect (std::string const& IP, int const PORT = 1025);
     void Disconnect ();
     void ReConnect ();
+    bool Check ();
 
     void StartLog (std::string const& OutFileName);
     void StopLog ();
@@ -91,7 +92,7 @@ class PMAC2Turbo
     void Save ();
     void Terminal ();
 
-    void Flush ();
+    bool Flush ();
     void IPAddress (std::string const& IP = "");
     void SendCTRLK ();
     void SendLine (std::string const& Line);
