@@ -235,7 +235,7 @@ void PMAC2Turbo::Save ()
 
 
 
-#define NWORDS 11
+#define NWORDS 13
 const char *words[NWORDS] = {
 ".help",
 ".quit",
@@ -247,7 +247,9 @@ const char *words[NWORDS] = {
 ".pvars",
 ".qvars",
 ".mvars",
-".mdefs"
+".mdefs",
+".cat",
+".ip"
 };
 
 // Generator function for word completion.
@@ -343,6 +345,7 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .qvars    [file] [start] [stop]    - dump Q variables to file (start stop optional integers)" << std::endl;
       std::cout << "  .mvars    [file] [start] [stop]    - dump M variables to file (start stop optional integers)" << std::endl;
       std::cout << "  .mdefs    [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
+      std::cout << "  .cat      [file] [start] [stop]    - print file from line start to stop" << std::endl;
       std::cout << "  .ip       [addr]                   - get ip, or set if [addr] is given" << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
@@ -428,6 +431,36 @@ void PMAC2Turbo::Terminal ()
       ss >> last;
       if (fn.size() > 0) {
         this->MVariableDefinitionDump(fn, 0x0, first, last);
+      } else {
+        std::cerr << "ERROR: no filename given" << std::endl;
+      }
+    } else if (bs.find(".cat") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      int first = 0;
+      int last = 9e99;
+      ss >> fn;
+      fn = "";
+      ss >> fn;
+      ss >> first;
+      ss >> last;
+      if (fn.size() > 0) {
+        int iline = 0;
+        std::ifstream fi(fn);
+        if (!fi.is_open()) {
+          std::cerr << "ERROR: cannot open file: " << fn << std::endl;
+          l() && fL << "ERROR: cannot open file: " << fn << std::endl;
+          continue;
+        }
+        for (std::string lfi; std::getline(fi, lfi); ++iline) {
+          if (iline >= first && iline <= last) {
+            std::cout << lfi << std::endl;
+            l() && fL << lfi << std::endl;
+          }
+          if (iline > last) {
+            break;
+          }
+        }
       } else {
         std::cerr << "ERROR: no filename given" << std::endl;
       }
@@ -685,6 +718,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
   bool IgnoreInput = false;
   int NErrors = 0;
+  int NIfDef = 0;
 
   // Loop over each line in file
   int i = 0;
@@ -736,6 +770,24 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       std::string NewFileName = std::string(key.begin() + 1, key.end() -1);
       NErrors += this->DownloadFile(NewFileName);
       Line = "";
+    }
+
+    size_t const ifdef_pos  = Line.find("#ifdef ");
+    size_t const ifndef_pos = Line.find("#ifndef ");
+    size_t const else_pos   = Line.find("#else ");
+    size_t const endif_pos  = Line.find("#endif ");
+
+    if (ifdef_pos != std::string::npos) {
+      ++NIfDef;
+      std::istringstream defstring(std::string(Line.begin() + ifdef_pos + 7, Line.end()));
+      std::string key;
+      defstring >> key;
+      if (key.size() == 0) {
+        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+        ++NErrors;
+      }
+      if (this->DefineKeyExists(key)) {
+      }
     }
 
 
@@ -1344,6 +1396,20 @@ void PMAC2Turbo::PrintDefinePairs ()
     l() && fL << fDefinePairs[i].first << "  " << fDefinePairs[i].second << std::endl;
   }
   return;
+}
+
+
+
+
+bool PMAC2Turbo::DefineKeyExists (std::string const& Key) const
+{
+  for (std::vector< std::pair<std::string, std::string> >::const_iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+    if (it->first == Key) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 

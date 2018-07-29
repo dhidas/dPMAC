@@ -139,6 +139,7 @@ class PMAC2Turbo
     int AddDefinePair (std::string const& Key, std::string const& Value);
     void ClearDefinePairs ();
     void PrintDefinePairs ();
+    bool DefineKeyExists (std::string const& Key) const;
 
     std::string ReplaceDefines (std::string const& IN);
 
