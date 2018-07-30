@@ -120,6 +120,8 @@ class PMAC2Turbo
     unsigned char fData[1401];
     std::string fDataSend;
 
+    std::vector<bool> fDefineStatus;
+
     std::ofstream fL;
     
     inline bool l()
@@ -134,6 +136,7 @@ class PMAC2Turbo
       return (l.first.size() > r.first.size());
     }
 
+    int ParseDefine (std::string const& In, std::string& Key, std::string& Value);
 
 
     int AddDefinePair (std::string const& Key, std::string const& Value);

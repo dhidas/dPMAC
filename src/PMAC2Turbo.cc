@@ -716,7 +716,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   }
 
 
-  bool IgnoreInput = false;
+  bool IgnoreCommentInput = false;
   int NErrors = 0;
   int NIfDef = 0;
 
@@ -724,6 +724,8 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   int i = 0;
   for (std::string Line; std::getline(fi, Line); ++i) {
 
+
+    // For comment chars ignore
     size_t begin_ignore = Line.find("/*");
     size_t end_ignore = Line.find("*/");
 
@@ -733,15 +735,15 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       end_ignore = Line.find("*/");
     }
 
-    if (IgnoreInput && end_ignore != std::string::npos) {
-      IgnoreInput = false;
+    if (IgnoreCommentInput && end_ignore != std::string::npos) {
+      IgnoreCommentInput = false;
       Line = std::string(Line.begin() + end_ignore + 2, Line.end());
-    } else if (IgnoreInput) {
+    } else if (IgnoreCommentInput) {
       continue;
     }
 
-    if (!IgnoreInput && begin_ignore != std::string::npos) {
-      IgnoreInput = true;
+    if (!IgnoreCommentInput && begin_ignore != std::string::npos) {
+      IgnoreCommentInput = true;
       Line = std::string(Line.begin(), Line.begin() + begin_ignore);
     }
 
@@ -755,6 +757,79 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     if (first_comment_pos != std::string::npos) {
       Line = std::string(Line.begin(), Line.begin() + first_comment_pos);
     }
+
+
+
+
+
+    // For ifdef, define.  No second statement is allowed on a line
+    size_t const define_pos = Line.find("#define ");
+    size_t const ifdef_pos  = Line.find("#ifdef ");
+    size_t const ifndef_pos = Line.find("#ifndef ");
+    size_t const else_pos   = Line.find("#else ");
+    size_t const endif_pos  = Line.find("#endif ");
+
+    if (define_pos != std::string::npos) {
+      std::string Key, Value;
+      this->ParseDefine(Line, Key, Value);
+      if (Key.size() == 0) {
+        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+        ++NErrors;
+      }
+      this->AddDefinePair(Key, Value);
+      Line = "";
+    } else if (ifdef_pos != std::string::npos) {
+      std::string Key, Value;
+      this->ParseDefine(Line, Key, Value);
+      if (Key.size() == 0) {
+        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+        ++NErrors;
+      }
+      if (this->DefineKeyExists(Key)) {
+        fDefineStatus.push_back(true);
+      } else {
+        fDefineStatus.push_back(false);
+      }
+      Line = "";
+    } else if (ifndef_pos != std::string::npos) {
+      std::string Key, Value;
+      this->ParseDefine(Line, Key, Value);
+      if (Key.size() == 0) {
+        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+        ++NErrors;
+      }
+      if (!this->DefineKeyExists(Key)) {
+        fDefineStatus.push_back(true);
+      } else {
+        fDefineStatus.push_back(false);
+      }
+      Line = "";
+    } else if (else_pos != std::string::npos) {
+      size_t const nstatus = fDefineStatus.size();
+      if (nstatus == 0) {
+        std::cerr << "ERROR: Syntaxt. #else detected before if" << std::endl;
+        return 1;
+      }
+      fDefineStatus[nstatus-1] = !fDefineStatus[nstatus-1];
+      Line = "";
+    } else if (endif_pos != std::string::npos) {
+      if (fDefineStatus.size() == 0) {
+        std::cerr << "ERROR: Syntaxt. #endif detected before if" << std::endl;
+        return 1;
+      }
+      fDefineStatus.pop_back();
+      Line = "";
+    }
+
+
+    if (fDefineStatus.size() > 0 && fDefineStatus.back() == false) {
+      continue;
+    }
+
+
+
+
+
 
     size_t include_pos = Line.find("#include ");
     if (include_pos != std::string::npos) {
@@ -772,42 +847,6 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       Line = "";
     }
 
-    size_t const ifdef_pos  = Line.find("#ifdef ");
-    size_t const ifndef_pos = Line.find("#ifndef ");
-    size_t const else_pos   = Line.find("#else ");
-    size_t const endif_pos  = Line.find("#endif ");
-
-    if (ifdef_pos != std::string::npos) {
-      ++NIfDef;
-      std::istringstream defstring(std::string(Line.begin() + ifdef_pos + 7, Line.end()));
-      std::string key;
-      defstring >> key;
-      if (key.size() == 0) {
-        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
-        ++NErrors;
-      }
-      if (this->DefineKeyExists(key)) {
-      }
-    }
-
-
-    size_t define_pos = Line.find("#define ");
-    if (define_pos != std::string::npos) {
-      std::istringstream defstring(std::string(Line.begin() + define_pos + 8, Line.end()));
-      std::string key;
-      defstring >> key;
-
-      std::string value = std::string(Line.begin() + Line.find(key) + key.size() + 1, Line.end());
-      if (Line.find_last_not_of(" \t\f\v\n\r") != std::string::npos) {
-        value = std::string(value.begin(), value.begin() + value.find_last_not_of(" \t\f\v\n\r") + 1);
-      }
-      if (value.find_first_not_of(" \t\f\v\n\r") != std::string::npos) {
-        value = std::string(value.begin() + value.find_first_not_of(" \t\f\v\n\r"), value.end());
-      }
-      this->AddDefinePair(key, value);
-
-      Line = std::string(Line.begin(), Line.begin() + define_pos);
-    }
 
     Line += '\0';
 
@@ -1358,9 +1397,46 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 
 
 
+int PMAC2Turbo::ParseDefine (std::string const& Line, std::string& Key, std::string& Value)
+{
+  // Parse a define statement.  Get Key and Value pair if available.
+  // Returns 1 for error, 0 for success
+
+  size_t const ifdef_pos  = Line.find("#ifdef ");
+  size_t const ifndef_pos = Line.find("#ifndef ");
+  size_t const define_pos = Line.find("#define ");
+
+  size_t pos, len;
+  if (define_pos != std::string::npos) {
+    pos = define_pos;
+    len = 8;
+  } else if (ifdef_pos != std::string::npos) {
+    pos = ifdef_pos;
+    len = 7;
+  } else if (ifndef_pos != std::string::npos) {
+    pos = ifndef_pos;
+    len = 8;
+  }
 
 
+  std::istringstream defstring(std::string(Line.begin() + pos + len, Line.end()));
+  defstring >> Key;
+  if (Key.size() == 0) {
+    std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+    return 1;
+  }
 
+  Value = std::string(Line.begin() + Line.find(Key) + Key.size() + 1, Line.end());
+  if (Line.find_last_not_of(" \t\f\v\n\r") != std::string::npos) {
+    Value = std::string(Value.begin(), Value.begin() + Value.find_last_not_of(" \t\f\v\n\r") + 1);
+  }
+  if (Value.find_first_not_of(" \t\f\v\n\r") != std::string::npos) {
+    Value = std::string(Value.begin() + Value.find_first_not_of(" \t\f\v\n\r"), Value.end());
+  }
+
+
+  return 0;
+}
 
 
 
