@@ -764,10 +764,11 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
     // For ifdef, define.  No second statement is allowed on a line
     size_t const define_pos = Line.find("#define ");
+    size_t const undef_pos  = Line.find("#undef ");
     size_t const ifdef_pos  = Line.find("#ifdef ");
     size_t const ifndef_pos = Line.find("#ifndef ");
-    size_t const else_pos   = Line.find("#else ");
-    size_t const endif_pos  = Line.find("#endif ");
+    size_t const else_pos   = Line.find("#else");
+    size_t const endif_pos  = Line.find("#endif");
 
     if (define_pos != std::string::npos) {
       std::string Key, Value;
@@ -777,6 +778,15 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
         ++NErrors;
       }
       this->AddDefinePair(Key, Value);
+      Line = "";
+    } else if (undef_pos != std::string::npos) {
+      std::string Key, Value;
+      this->ParseDefine(Line, Key, Value);
+      if (Key.size() == 0) {
+        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+        ++NErrors;
+      }
+      this->RemoveDefine(Key);
       Line = "";
     } else if (ifdef_pos != std::string::npos) {
       std::string Key, Value;
@@ -821,7 +831,6 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       Line = "";
     }
 
-
     if (fDefineStatus.size() > 0 && fDefineStatus.back() == false) {
       continue;
     }
@@ -849,8 +858,20 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
 
     Line += '\0';
+    //Line.erase(std::remove(Line.begin(), Line.end(), '\t'), Line.end());
+    size_t tab_pos = Line.find('\t');
+    while (tab_pos != std::string::npos) {
+      Line.replace(tab_pos, 1, " ");
+      tab_pos = Line.find('\t');
+    }
+    size_t ctrlm_pos = Line.find(CTRLM);
+    while (ctrlm_pos != std::string::npos) {
+      Line.replace(ctrlm_pos, 1, " ");
+      ctrlm_pos = Line.find(CTRLM);
+    }
 
     Line = this->ReplaceDefines(Line);
+
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
@@ -863,8 +884,10 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
     // Check for an error
     if (fData[3] == 0x80) {
-      std::cerr << "Error at line " << i << " in file " << InFileName << std::endl;
+      std::cerr << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
+      l() && fL << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
       std::cerr << "  Input was: " << Line << std::endl;
+      l() && fL << "  Input was: " << Line << std::endl;
       ++NErrors;
     }
 
@@ -874,6 +897,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   if (NFileDepth == 0) {
     // Remove dictionary
     this->ClearDefinePairs();
+    this->Flush();
   }
 
   return 0;
@@ -1405,11 +1429,15 @@ int PMAC2Turbo::ParseDefine (std::string const& Line, std::string& Key, std::str
   size_t const ifdef_pos  = Line.find("#ifdef ");
   size_t const ifndef_pos = Line.find("#ifndef ");
   size_t const define_pos = Line.find("#define ");
+  size_t const undef_pos  = Line.find("#undef ");
 
   size_t pos, len;
   if (define_pos != std::string::npos) {
     pos = define_pos;
     len = 8;
+  } else if (undef_pos != std::string::npos) {
+    pos = undef_pos;
+    len = 7;
   } else if (ifdef_pos != std::string::npos) {
     pos = ifdef_pos;
     len = 7;
@@ -1424,6 +1452,11 @@ int PMAC2Turbo::ParseDefine (std::string const& Line, std::string& Key, std::str
   if (Key.size() == 0) {
     std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
     return 1;
+  }
+
+  if (Line.begin() + Line.find(Key) + Key.size() + 1 >= Line.end()) {
+    Value = "";
+    return 0;
   }
 
   Value = std::string(Line.begin() + Line.find(Key) + Key.size() + 1, Line.end());
@@ -1486,6 +1519,21 @@ bool PMAC2Turbo::DefineKeyExists (std::string const& Key) const
   }
 
   return false;
+}
+
+
+
+
+void PMAC2Turbo::RemoveDefine (std::string const& Key)
+{
+  for (std::vector< std::pair<std::string, std::string> >::const_iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+    if (it->first == Key) {
+      fDefinePairs.erase(it);
+      return;
+    }
+  }
+
+  return;
 }
 
 
