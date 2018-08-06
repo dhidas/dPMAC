@@ -769,10 +769,10 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
 
     // For ifdef, define.  No second statement is allowed on a line
-    size_t const define_pos = Line.find("#define ");
-    size_t const undef_pos  = Line.find("#undef ");
-    size_t const ifdef_pos  = Line.find("#ifdef ");
-    size_t const ifndef_pos = Line.find("#ifndef ");
+    size_t const define_pos = Line.find("#define");
+    size_t const undef_pos  = Line.find("#undef");
+    size_t const ifdef_pos  = Line.find("#ifdef");
+    size_t const ifndef_pos = Line.find("#ifndef");
     size_t const else_pos   = Line.find("#else");
     size_t const endif_pos  = Line.find("#endif");
 
@@ -783,7 +783,8 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
         std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
         ++NErrors;
       }
-      this->AddDefinePair(Key, Value);
+      std::string const ReplacedValue = this->ReplaceDefines(Value);
+      this->AddDefinePair(Key, ReplacedValue);
       Line = "";
     } else if (undef_pos != std::string::npos) {
       std::string Key, Value;
@@ -838,6 +839,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     }
 
     if (fDefineStatus.size() > 0 && fDefineStatus.back() == false) {
+      std::cout << "skipping line: " << Line << std::endl;
       continue;
     }
 
@@ -846,7 +848,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
 
 
-    size_t include_pos = Line.find("#include ");
+    size_t include_pos = Line.find("#include");
     if (include_pos != std::string::npos) {
       std::istringstream incstring(std::string(Line.begin() + include_pos + 9, Line.end()));
       std::string key;
