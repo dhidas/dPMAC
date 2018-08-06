@@ -12,7 +12,7 @@
 #include "PMAC2Turbo.h"
 
 
-int dpterm (std::string const& IP, int const PORT = 1025)
+int dpterm (std::string const& IP = "", int const PORT = 1025)
 {
 
   PMAC2Turbo PMAC(IP, PORT);
@@ -24,12 +24,14 @@ int dpterm (std::string const& IP, int const PORT = 1025)
 
 int main (int argc, char* argv[])
 {
-  if (argc != 2 && argc != 3) {
+  if (argc != 1 && argc != 2 && argc != 3) {
     std::cerr << "Usage: " << argv[0] << " [IP] [PORT]" << std::endl;
     return 1;
   }
 
-  if (argc == 2) {
+  if (argc == 1) {
+    dpterm();
+  } else if (argc == 2) {
     dpterm(argv[1]);
   } else {
     dpterm(argv[1], atoi(argv[2]));

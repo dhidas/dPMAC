@@ -438,11 +438,17 @@ void PMAC2Turbo::Terminal ()
       std::istringstream ss(bs);
       std::string fn;
       int first = 0;
-      int last = 9e99;
+      int last = 999999;
       ss >> fn;
       fn = "";
       ss >> fn;
+      if (ss.eof()) {
+        first = 0;
+      }
       ss >> first;
+      if (ss.eof()) {
+        last = 999999;
+      }
       ss >> last;
       if (fn.size() > 0) {
         int iline = 0;
@@ -452,12 +458,12 @@ void PMAC2Turbo::Terminal ()
           l() && fL << "ERROR: cannot open file: " << fn << std::endl;
           continue;
         }
+
         for (std::string lfi; std::getline(fi, lfi); ++iline) {
           if (iline >= first && iline <= last) {
             std::cout << lfi << std::endl;
             l() && fL << lfi << std::endl;
-          }
-          if (iline > last) {
+          } else if (iline > last) {
             break;
           }
         }
