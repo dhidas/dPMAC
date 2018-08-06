@@ -1434,12 +1434,13 @@ int PMAC2Turbo::ParseDefine (std::string const& Line, std::string& Key, std::str
   // Parse a define statement.  Get Key and Value pair if available.
   // Returns 1 for error, 0 for success
 
-  size_t const ifdef_pos  = Line.find("#ifdef ");
-  size_t const ifndef_pos = Line.find("#ifndef ");
-  size_t const define_pos = Line.find("#define ");
-  size_t const undef_pos  = Line.find("#undef ");
+  size_t const ifdef_pos  = Line.find("#ifdef");
+  size_t const ifndef_pos = Line.find("#ifndef");
+  size_t const define_pos = Line.find("#define");
+  size_t const undef_pos  = Line.find("#undef");
 
-  size_t pos, len;
+  size_t pos = std::string::npos;
+  size_t len = 0;
   if (define_pos != std::string::npos) {
     pos = define_pos;
     len = 8;
