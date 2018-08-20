@@ -235,7 +235,7 @@ void PMAC2Turbo::Save ()
 
 
 
-#define NWORDS 13
+#define NWORDS 14
 const char *words[NWORDS] = {
 ".help",
 ".quit",
@@ -249,7 +249,8 @@ const char *words[NWORDS] = {
 ".mvars",
 ".mdefs",
 ".cat",
-".ip"
+".ip",
+".watch"
 };
 
 // Generator function for word completion.
@@ -347,6 +348,7 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .mdefs    [file] [start] [stop]    - dump M variable definitions to file (start stop optional integers)" << std::endl;
       std::cout << "  .cat      [file] [start] [stop]    - print file from line start to stop" << std::endl;
       std::cout << "  .ip       [addr]                   - get ip, or set if [addr] is given" << std::endl;
+      std::cout << "  .watch    [cmds]                   - watch vars " << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
@@ -531,6 +533,35 @@ void PMAC2Turbo::Terminal ()
         this->IPAddress(fn);
       } else {
         this->IPAddress();
+      }
+    } else if (bs.find(".watch") == 0) {
+      std::istringstream ss(bs);
+      std::string fn;
+      ss >> fn;
+      std::vector<std::string> myvars;
+      while(ss >> fn) {
+        myvars.push_back(fn);
+      }
+
+      std::string watchline = "";
+      for (size_t iwatch = 0; iwatch != myvars.size(); ++iwatch) {
+        watchline += myvars[iwatch] + ' ';
+      }
+      std::ostringstream oss;
+
+      while (true) {
+      oss.str("");
+      this->SendLine(watchline);
+      this->GetBuffer("", &oss, false);
+      std::string myout = oss.str();
+
+      size_t bsn = myout.find('\n');
+      while (bsn != std::string::npos) {
+        myout.replace(bsn, 1, "   ");
+        bsn = myout.find('\n');
+      }
+      std::cout << myout << std::endl;
+      sleep(1);
       }
     } else {
       // Check if socket at least defined
@@ -1020,10 +1051,10 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
         l() && fL << fData[j];
       }
       if (!ack_found) {
-        cout && std::cout << std::endl;
-        so   &&       *so << std::endl;
-        fo   &&       *fo << std::endl;
-        l() && fL << std::endl;
+        cout && std::cout << '\n';
+        so   &&       *so << '\n';
+        fo   &&       *fo << '\n';
+        l() && fL << '\n';
       }
 
     }
