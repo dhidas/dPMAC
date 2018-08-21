@@ -25,6 +25,7 @@
 //#include <netdb.h>
 //#include <cstdlib>
 #include <bitset>
+#include <iomanip>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -911,6 +912,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
     Line = this->ReplaceDefines(Line);
 
+    //std::cout << "send: " << Line << std::endl;
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
@@ -921,8 +923,10 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
 
+    //std::cout << "recv: " << std::hex << (unsigned int) fData[3] << std::dec << std::endl;
+
     // Check for an error
-    if (fData[3] == 0x80) {
+    if (fData[3] == 0x80 || fData[3] == 0xff) {
       std::cerr << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
       l() && fL << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
       std::cerr << "  Input was: " << Line << std::endl;
