@@ -25,6 +25,7 @@
 //#include <netdb.h>
 //#include <cstdlib>
 #include <bitset>
+#include <iomanip>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -33,6 +34,9 @@ PMAC2Turbo::PMAC2Turbo ()
 {
   // Default constructor
   fSocket = -1;
+
+  // IfCounter
+  fIfTotal = 0;
 }
 
 
@@ -47,6 +51,9 @@ PMAC2Turbo::PMAC2Turbo (std::string const& IP, int const PORT)
   fSocket = -1;
 
   this->Connect(IP, PORT);
+
+  // IfCounter
+  fIfTotal = 0;
 }
 
 
@@ -142,7 +149,7 @@ void PMAC2Turbo::StartLog (std::string const& OutFileName)
 
   std::cout << "Start logging to: " << OutFileName << std::endl;
   // Open log file for writing
-  fL.open(OutFileName);
+  fL.open(OutFileName.c_str());
   if (!fL.is_open()) {
     std::cerr << "ERROR: cannot open logfile for writing: " << OutFileName << std::endl;
     return;
@@ -320,7 +327,7 @@ void PMAC2Turbo::Terminal ()
 
 
   char* buf;
-  while ((buf = readline(">> ")) != nullptr) {
+  while ((buf = readline(">> ")) != NULL) {
     if (strlen(buf) > 0) {
       add_history(buf);
     }
@@ -454,7 +461,7 @@ void PMAC2Turbo::Terminal ()
       ss >> last;
       if (fn.size() > 0) {
         int iline = 0;
-        std::ifstream fi(fn);
+        std::ifstream fi(fn.c_str());
         if (!fi.is_open()) {
           std::cerr << "ERROR: cannot open file: " << fn << std::endl;
           l() && fL << "ERROR: cannot open file: " << fn << std::endl;
@@ -573,7 +580,7 @@ void PMAC2Turbo::Terminal ()
 
 
     if (Logging && LogFileName != "" && !LogFile.is_open()) {
-      LogFile.open(LogFileName);
+      LogFile.open(LogFileName.c_str());
       if (!LogFile.is_open()) {
         std::cerr << "ERROR: cannot open logfile: " << LogFileName << std::endl;
         Logging = false;
@@ -745,13 +752,15 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     return 1;
   }
   // Open file for reading
-  std::ifstream fi(InFileName);
+  std::ifstream fi(InFileName.c_str());
   if (!fi.is_open()) {
     std::cerr << "ERROR: cannot open file: " << InFileName << std::endl;
     l() && fL << "ERROR: cannot open file: " << InFileName << std::endl;
     return -1;
   }
 
+  // If in an #ifdef ignore, count if and ifn up and endif down
+  size_t InIfIgnoreIfCount = 0;
 
   bool IgnoreCommentInput = false;
   int NErrors = 0;
@@ -807,7 +816,10 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     size_t const else_pos   = Line.find("#else");
     size_t const endif_pos  = Line.find("#endif");
 
-    if (define_pos != std::string::npos) {
+
+    bool const InIfIgnore = (fDefineStatus.size() > 0 && fDefineStatus.back() == false);
+
+    if (!InIfIgnore && define_pos != std::string::npos) {
       std::string Key, Value;
       this->ParseDefine(Line, Key, Value);
       if (Key.size() == 0) {
@@ -817,7 +829,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       std::string const ReplacedValue = this->ReplaceDefines(Value);
       this->AddDefinePair(Key, ReplacedValue);
       Line = "";
-    } else if (undef_pos != std::string::npos) {
+    } else if (!InIfIgnore && undef_pos != std::string::npos) {
       std::string Key, Value;
       this->ParseDefine(Line, Key, Value);
       if (Key.size() == 0) {
@@ -827,32 +839,40 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       this->RemoveDefine(Key);
       Line = "";
     } else if (ifdef_pos != std::string::npos) {
-      std::string Key, Value;
-      this->ParseDefine(Line, Key, Value);
-      if (Key.size() == 0) {
-        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
-        ++NErrors;
-      }
-      if (this->DefineKeyExists(Key)) {
-        fDefineStatus.push_back(true);
+      if (InIfIgnore) {
+        ++InIfIgnoreIfCount;
       } else {
-        fDefineStatus.push_back(false);
+        std::string Key, Value;
+        this->ParseDefine(Line, Key, Value);
+        if (Key.size() == 0) {
+          std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+          ++NErrors;
+        }
+        if (this->DefineKeyExists(Key)) {
+          fDefineStatus.push_back(true);
+        } else {
+          fDefineStatus.push_back(false);
+        }
+        Line = "";
       }
-      Line = "";
     } else if (ifndef_pos != std::string::npos) {
-      std::string Key, Value;
-      this->ParseDefine(Line, Key, Value);
-      if (Key.size() == 0) {
-        std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
-        ++NErrors;
-      }
-      if (!this->DefineKeyExists(Key)) {
-        fDefineStatus.push_back(true);
+      if (InIfIgnore) {
+        ++InIfIgnoreIfCount;
       } else {
-        fDefineStatus.push_back(false);
+        std::string Key, Value;
+        this->ParseDefine(Line, Key, Value);
+        if (Key.size() == 0) {
+          std::cerr << "ERROR: #ifdef statement incomplete in: " << Line << std::endl;
+          ++NErrors;
+        }
+        if (!this->DefineKeyExists(Key)) {
+          fDefineStatus.push_back(true);
+        } else {
+          fDefineStatus.push_back(false);
+        }
+        Line = "";
       }
-      Line = "";
-    } else if (else_pos != std::string::npos) {
+    } else if (!InIfIgnore && else_pos != std::string::npos) {
       size_t const nstatus = fDefineStatus.size();
       if (nstatus == 0) {
         std::cerr << "ERROR: Syntaxt. #else detected before if" << std::endl;
@@ -861,16 +881,20 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
       fDefineStatus[nstatus-1] = !fDefineStatus[nstatus-1];
       Line = "";
     } else if (endif_pos != std::string::npos) {
-      if (fDefineStatus.size() == 0) {
-        std::cerr << "ERROR: Syntaxt. #endif detected before if" << std::endl;
-        return 1;
+      if (InIfIgnore && InIfIgnoreIfCount > 0) {
+        --InIfIgnoreIfCount;
+      } else {
+        if (fDefineStatus.size() == 0) {
+          std::cerr << "ERROR: Syntaxt. #endif detected before if" << std::endl;
+          return 1;
+        }
+        fDefineStatus.pop_back();
+        Line = "";
       }
-      fDefineStatus.pop_back();
-      Line = "";
     }
 
     if (fDefineStatus.size() > 0 && fDefineStatus.back() == false) {
-      std::cout << "skipping line: " << Line << std::endl;
+      //std::cout << "skipping line: " << Line << std::endl;
       continue;
     }
 
@@ -911,6 +935,11 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 
     Line = this->ReplaceDefines(Line);
 
+    if (Line.size() == 1) {
+      continue;
+    }
+
+    //std::cout << "send: " << Line << std::endl;
 
     fEthCmd.RequestType = VR_DOWNLOAD;
     fEthCmd.Request     = VR_PMAC_WRITEBUFFER;
@@ -921,8 +950,10 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
     recv(fSocket, (char*) &fData, 4, 0);
 
+    //std::cout << "recv: " << std::hex << (unsigned int) fData[3] << std::dec << std::endl;
+
     // Check for an error
-    if (fData[3] == 0x80) {
+    if (fData[3] == 0x80 || fData[3] == 0xff) {
       std::cerr << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
       l() && fL << "Error " << (unsigned short) fData[2] << " at line " << i << " in file " << InFileName << std::endl;
       std::cerr << "  Input was: " << Line << std::endl;
@@ -1129,7 +1160,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
   if (OutFileName != "") {
-    fo = new std::ofstream(OutFileName);
+    fo = new std::ofstream(OutFileName.c_str());
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
       return;
@@ -1185,7 +1216,7 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::o
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
   if (OutFileName != "") {
-    fo = new std::ofstream(OutFileName);
+    fo = new std::ofstream(OutFileName.c_str());
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
       return;
@@ -1241,7 +1272,7 @@ void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int 
   // Check if filename exists and use it for output if so
   std::ofstream* fo = 0x0;
   if (OutFileName != "") {
-    fo = new std::ofstream(OutFileName);
+    fo = new std::ofstream(OutFileName.c_str());
     if (!fo->is_open()) {
       std::cerr << "ERROR: cannot open file" << std::endl;
       return;
@@ -1291,7 +1322,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   }
 
   // Open file for writing
-  std::ofstream fo(OutFileName);
+  std::ofstream fo(OutFileName.c_str());
   if (!fo.is_open()) {
     std::cerr << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
     l() && fL << "ERROR: cannot open file for writing: " << OutFileName << std::endl;
@@ -1566,7 +1597,7 @@ bool PMAC2Turbo::DefineKeyExists (std::string const& Key) const
 
 void PMAC2Turbo::RemoveDefine (std::string const& Key)
 {
-  for (std::vector< std::pair<std::string, std::string> >::const_iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
+  for (std::vector< std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
     if (it->first == Key) {
       fDefinePairs.erase(it);
       return;

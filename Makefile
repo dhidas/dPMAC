@@ -1,6 +1,6 @@
 CC = g++
 LD = g++
-CFLAGS = -Wall -O3 -std=c++14
+CFLAGS = -Wall -O3
 LIBS = -lreadline
 INCLUDE = -Iinclude
 OBJS  = $(patsubst src/%.cc,lib/%.o,$(wildcard src/*.cc))
