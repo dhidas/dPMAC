@@ -237,20 +237,20 @@ void PMAC2Turbo::Save ()
 
 #define NWORDS 14
 const char *words[NWORDS] = {
-".help",
-".quit",
-".download",
-".logging",
-".gather",
-".backup",
-".ivars",
-".pvars",
-".qvars",
-".mvars",
-".mdefs",
-".cat",
-".ip",
-".watch"
+".help ",
+".quit ",
+".download ",
+".logging ",
+".gather ",
+".backup ",
+".ivars ",
+".pvars ",
+".qvars ",
+".mvars ",
+".mdefs ",
+".cat ",
+".ip ",
+".watch "
 };
 
 // Generator function for word completion.
