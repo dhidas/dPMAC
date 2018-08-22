@@ -121,6 +121,7 @@ class PMAC2Turbo
     std::string fDataSend;
 
     std::vector<bool> fDefineStatus;
+    size_t fIfTotal;
 
     std::ofstream fL;
     
