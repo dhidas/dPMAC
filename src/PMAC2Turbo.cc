@@ -1623,6 +1623,10 @@ std::string PMAC2Turbo::ReplaceDefines (std::string const& IN)
     }
   }
 
+  if (false && IN != OUT) {
+    std::cout << "IN:  " << IN << std::endl;
+    std::cout << "OUT: " << OUT << std::endl;
+  }
   return OUT;
 }
 
