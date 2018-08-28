@@ -1549,9 +1549,11 @@ int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
 {
   for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
     if (Key == it->first) {
-      std::cerr << "Warning: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-      l() && fL << "Warning: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-      return 1;
+      if (Value != it->second) {
+        std::cerr << "ERROR: #define key already seen and now defined differently.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+        l() && fL << "ERROR: #define key already seen and now defined differently.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+        return 1;
+      }
     }
   }
   fDefinePairs.push_back(std::make_pair(Key, Value));
