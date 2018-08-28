@@ -767,8 +767,19 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   int NIfDef = 0;
 
   // Loop over each line in file
-  int i = 0;
+  int i = 1;
   for (std::string Line; std::getline(fi, Line); ++i) {
+
+    // Look for line comment chars
+    size_t comment_pos = Line.find(";");
+    size_t first_comment_pos = comment_pos;
+    comment_pos = Line.find("//");
+    if (comment_pos < first_comment_pos) {
+      first_comment_pos = comment_pos;
+    }
+    if (first_comment_pos != std::string::npos) {
+      Line = std::string(Line.begin(), Line.begin() + first_comment_pos);
+    }
 
 
     // For comment chars ignore
@@ -791,17 +802,6 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
     if (!IgnoreCommentInput && begin_ignore != std::string::npos) {
       IgnoreCommentInput = true;
       Line = std::string(Line.begin(), Line.begin() + begin_ignore);
-    }
-
-    // Look for comment chars
-    size_t comment_pos = Line.find(";");
-    size_t first_comment_pos = comment_pos;
-    comment_pos = Line.find("//");
-    if (comment_pos < first_comment_pos) {
-      first_comment_pos = comment_pos;
-    }
-    if (first_comment_pos != std::string::npos) {
-      Line = std::string(Line.begin(), Line.begin() + first_comment_pos);
     }
 
 
@@ -1549,8 +1549,8 @@ int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
 {
   for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
     if (Key == it->first) {
-      std::cerr << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-      l() && fL << "Error: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+      std::cerr << "Warning: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
+      l() && fL << "Warning: #define key already seen.  Ignoring redefinition: " << Key << " " << Value << std::endl;
       return 1;
     }
   }
@@ -1614,12 +1614,19 @@ std::string PMAC2Turbo::ReplaceDefines (std::string const& IN)
 {
   std::string OUT = IN;
 
-  size_t pos;
-  for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
-    pos = OUT.find(it->first);
-    while (pos != std::string::npos) {
-      OUT = std::string(OUT.begin(), OUT.begin() + pos) + it->second + std::string(OUT.begin() + pos + it->first.size(), OUT.end());
+  // As long as you made a change last time, try again
+  bool TryReplace = true;
+
+  while (TryReplace) {
+    TryReplace = false;
+    size_t pos;
+    for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
       pos = OUT.find(it->first);
+      while (pos != std::string::npos) {
+        TryReplace = true;
+        OUT = std::string(OUT.begin(), OUT.begin() + pos) + it->second + std::string(OUT.begin() + pos + it->first.size(), OUT.end());
+        pos = OUT.find(it->first);
+      }
     }
   }
 
