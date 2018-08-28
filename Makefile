@@ -10,6 +10,11 @@ EXEOBJS  = $(patsubst exe/%.cc,lib/%.o,$(wildcard exe/*.cc))
 
 all: $(OBJS) $(EXEOBJS) $(EXECS)
 
+install:
+	make all
+	mkdir -pv ~/bin
+	cp bin/* ~/bin
+
 lib/%.o : src/%.cc
 	$(CC) -Wall $(CFLAGS) $(INCLUDE) -c $< -o $@
 
