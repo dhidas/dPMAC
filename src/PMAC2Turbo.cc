@@ -1550,9 +1550,10 @@ int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
   for (std::vector<std::pair<std::string, std::string> >::iterator it = fDefinePairs.begin(); it != fDefinePairs.end(); ++it) {
     if (Key == it->first) {
       if (Value != it->second) {
-        std::cerr << "ERROR: #define key already seen and now defined differently.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-        l() && fL << "ERROR: #define key already seen and now defined differently.  Ignoring redefinition: " << Key << " " << Value << std::endl;
-        return 1;
+        std::cerr << "WARNING: #define key already seen and now defined differently.: " << Key << " " << it->second << " -> " << Value << std::endl;
+        l() && fL << "WARNING: #define key already seen and now defined differently.: " << Key << " " << it->second << " -> " << Value << std::endl;
+        it->second = Value;
+        return 0;
       }
     }
   }
