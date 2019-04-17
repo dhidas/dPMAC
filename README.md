@@ -13,9 +13,8 @@ executables land in bin/
 
 ### dpterm
 Open a terminal application to a pmac:
-
-dpterm [IP address]
 ```
+dpterm [IP address]
 >> .help
 Commands:
   .help                              - print help
