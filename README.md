@@ -36,15 +36,15 @@ Commands:
   
 ### dpbackup
 Make a backup file from what is currently on the PMAC
-  
+```  
 dpbackup [IP address] [OutFile]
-
+```
 
 ### dpdownload
 Download a file to PMAC.  Does not issue a save
-
+```
 dpdownload [IP address] [InFile]
-
+```
 
 ### dprestore
 Download file to PMAC from factory reset.  Issues the following commands in order:
@@ -54,17 +54,18 @@ $$$
 [the download]
 save
 $$$
-
+```
 dprestore [IP address] [InFile]
-
+```
 
 ### dpip
 Change the IP address on a device (make sure to hold the switch on PMAC)
-
+```
 dpip [IP address] [new IP address]
-
+```
 
 ### dpgather
 Download the gather buffer in hex format from PMAC
-
+```
 dpgather [IP address] [OutFile]
+```
