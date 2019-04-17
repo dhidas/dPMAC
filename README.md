@@ -48,12 +48,7 @@ dpdownload [IP address] [InFile]
 
 ### dprestore
 Download file to PMAC from factory reset.  Issues the following commands in order:
-$$$***
-save
-$$$
-[the download]
-save
-$$$
+$$$***, save, $$$, [the download], save, $$$
 ```
 dprestore [IP address] [InFile]
 ```
