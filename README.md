@@ -15,6 +15,7 @@ executables land in bin/
 Open a terminal application to a pmac:
 
 dpterm [IP address]
+```
 >> .help
 Commands:
   .help                              - print help
@@ -31,7 +32,7 @@ Commands:
   .cat      [file] [start] [stop]    - print file from line start to stop
   .ip       [addr]                   - get ip, or set if [addr] is given
   .watch    [cmds]                   - watch vars
-  
+```
   
 ### dpbackup
 Make a backup file from what is currently on the PMAC
