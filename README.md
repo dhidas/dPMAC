@@ -63,3 +63,15 @@ Download the gather buffer in hex format from PMAC
 ```
 dpgather [IP address] [OutFile]
 ```
+
+### dpsave
+Issue a save command to given PMAC
+```
+dpsave [IP address]
+```
+
+### dpreboot
+Issue the reboot command ($$$) to given PMAC
+```
+dpreboot [IP address]
+```
