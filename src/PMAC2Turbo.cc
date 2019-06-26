@@ -966,7 +966,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
   --NFileDepth;
   if (NFileDepth == 0) {
     // Remove dictionary
-    this->ClearDefinePairs();
+    //this->ClearDefinePairs();
     this->Flush();
   }
 
@@ -1555,6 +1555,7 @@ int PMAC2Turbo::AddDefinePair (std::string const& Key, std::string const& Value)
         it->second = Value;
         return 0;
       }
+      return 0;
     }
   }
   fDefinePairs.push_back(std::make_pair(Key, Value));
@@ -1574,10 +1575,12 @@ void PMAC2Turbo::ClearDefinePairs ()
 
 void PMAC2Turbo::PrintDefinePairs ()
 {
+  std::cout << "*** PrintDefinePairs BEGIN***" << std::endl;
   for (size_t i = 0; i != fDefinePairs.size(); ++i) {
     std::cout << fDefinePairs[i].first << "  " << fDefinePairs[i].second << std::endl;
     l() && fL << fDefinePairs[i].first << "  " << fDefinePairs[i].second << std::endl;
   }
+  std::cout << "*** PrintDefinePairs END  ***" << std::endl;
   return;
 }
 

@@ -108,6 +108,8 @@ class PMAC2Turbo
 
     std::string ReplaceDefinesInString (std::string const& InString);
 
+    void PrintDefinePairs ();
+
     void PrintBits (char c);
 
 
@@ -142,7 +144,6 @@ class PMAC2Turbo
 
     int AddDefinePair (std::string const& Key, std::string const& Value);
     void ClearDefinePairs ();
-    void PrintDefinePairs ();
     bool DefineKeyExists (std::string const& Key) const;
     void RemoveDefine(std::string const& Key);
 

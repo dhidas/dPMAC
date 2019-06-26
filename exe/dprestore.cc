@@ -24,6 +24,7 @@ int dprestore (std::string const& IP, std::string const& InFileName)
     return 1;
   }
 
+  //PMAC.PrintDefinePairs();
   return 0;
 }
 
