@@ -576,10 +576,7 @@ void PMAC2Turbo::Terminal ()
       if (this->Check()) {
         std::string mstatus = this->GetResponseString("?");
         if (mstatus.size() == 12) {
-          unsigned long const wX = atoi( mstatus.substr(0, 6).c_str());
-          unsigned long const wY = atoi( mstatus.substr(6, 6).c_str());
-          std::cout << std::hex << wX << " " << wY << std::dec << std::endl;
-
+          std::cout << mstatus.substr(0, 6) << " " << mstatus.substr(6, 6) << std::endl;
 
 
           const char* w = mstatus.c_str();
