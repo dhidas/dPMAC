@@ -610,7 +610,8 @@ void PMAC2Turbo::Terminal ()
           std::cout << ((w[5]  & (1<<2))!=0) << " (bit 02) Software Position Capture\n";
           std::cout << ((w[5]  & (1<<1))!=0) << " (bit 01) Integrator in Velocity Loop\n";
           std::cout << ((w[5]  & (1<<0))!=0) << " (bit 00) Alternate Command-Output Mode\n";
-                               
+          
+          std::cout << "\n";          
                                
           std::cout << ((w[6]  & (1<<3))!=0) << " (bit 23) (CS-1) # bit 3 (MSB)\n";
           std::cout << ((w[6]  & (1<<2))!=0) << " (bit 22) (CS-1) # bit 2\n";
