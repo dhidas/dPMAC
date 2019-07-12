@@ -242,7 +242,7 @@ void PMAC2Turbo::Save ()
 
 
 
-#define NWORDS 14
+#define NWORDS 15
 const char *words[NWORDS] = {
 ".help ",
 ".quit ",
@@ -257,7 +257,8 @@ const char *words[NWORDS] = {
 ".mdefs ",
 ".cat ",
 ".ip ",
-".watch "
+".watch ",
+".?"
 };
 
 // Generator function for word completion.
@@ -356,6 +357,7 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .cat      [file] [start] [stop]    - print file from line start to stop" << std::endl;
       std::cout << "  .ip       [addr]                   - get ip, or set if [addr] is given" << std::endl;
       std::cout << "  .watch    [cmds]                   - watch vars " << std::endl;
+      std::cout << "  .?                                 - print motor status of current motor " << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
     } else if (bs == "$$$***") {
@@ -569,6 +571,83 @@ void PMAC2Turbo::Terminal ()
       }
       std::cout << myout << std::endl;
       sleep(1);
+      }
+    } else if (bs.find(".?") == 0) {
+      if (this->Check()) {
+        std::string mstatus = this->GetResponseString("?");
+        if (mstatus.size() == 12) {
+          unsigned long const wX = atoi( mstatus.substr(0, 6).c_str());
+          unsigned long const wY = atoi( mstatus.substr(6, 6).c_str());
+          std::cout << std::hex << wX << " " << wY << std::dec << std::endl;
+
+
+
+          const char* w = mstatus.c_str();
+
+          std::cout << ((w[0]  & (1<<3))!=0) << " (bit 23) Motor Activated\n";
+          std::cout << ((w[0]  & (1<<2))!=0) << " (bit 22) Negative End Limit Set\n";
+          std::cout << ((w[0]  & (1<<1))!=0) << " (bit 21) Positive End Limit Set\n";
+          std::cout << ((w[0]  & (1<<0))!=0) << " (bit 20) Extended Servo Algorithm Enabled\n";
+                               
+          std::cout << ((w[1]  & (1<<3))!=0) << " (bit 19) Amplifier Enabled\n";
+          std::cout << ((w[1]  & (1<<2))!=0) << " (bit 18) Open Loop Mode\n";
+          std::cout << ((w[1]  & (1<<1))!=0) << " (bit 17) Move Timer Active\n";
+          std::cout << ((w[1]  & (1<<0))!=0) << " (bit 16) Integration Mode\n";
+                               
+          std::cout << ((w[2]  & (1<<3))!=0) << " (bit 15) Dwell in Progress\n";
+          std::cout << ((w[2]  & (1<<2))!=0) << " (bit 14) Data Block Error\n";
+          std::cout << ((w[2]  & (1<<1))!=0) << " (bit 13) Desired Velocity Zero\n";
+          std::cout << ((w[2]  & (1<<0))!=0) << " (bit 12) Abort Deceleration\n";
+                               
+          std::cout << ((w[3]  & (1<<3))!=0) << " (bit 11) Block Request\n";
+          std::cout << ((w[3]  & (1<<2))!=0) << " (bit 10) Home Search in Progress\n";
+          std::cout << ((w[3]  & (1<<1))!=0) << " (bit 09) User-Written Phase Enable\n";
+          std::cout << ((w[3]  & (1<<0))!=0) << " (bit 08) User-Written Servo Enable\n";
+                               
+          std::cout << ((w[4]  & (1<<3))!=0) << " (bit 07) Alternate Source/Destination\n";
+          std::cout << ((w[4]  & (1<<2))!=0) << " (bit 06) Phased Motor\n";
+          std::cout << ((w[4]  & (1<<1))!=0) << " (bit 05) Following Offset Mode\n";
+          std::cout << ((w[4]  & (1<<0))!=0) << " (bit 04) Following Enabled\n";
+                               
+          std::cout << ((w[5]  & (1<<3))!=0) << " (bit 03) Error Trigger\n";
+          std::cout << ((w[5]  & (1<<2))!=0) << " (bit 02) Software Position Capture\n";
+          std::cout << ((w[5]  & (1<<1))!=0) << " (bit 01) Integrator in Velocity Loop\n";
+          std::cout << ((w[5]  & (1<<0))!=0) << " (bit 00) Alternate Command-Output Mode\n";
+                               
+                               
+          std::cout << ((w[6]  & (1<<3))!=0) << " (bit 23) (CS-1) # bit 3 (MSB)\n";
+          std::cout << ((w[6]  & (1<<2))!=0) << " (bit 22) (CS-1) # bit 2\n";
+          std::cout << ((w[6]  & (1<<1))!=0) << " (bit 21) (CS-1) # bit 1\n";
+          std::cout << ((w[6]  & (1<<0))!=0) << " (bit 20) (CS-1) # bit 0\n";
+                               
+          std::cout << ((w[7]  & (1<<3))!=0) << " (bit 19) Coordinate Definition # bit 3 (MSB)\n";
+          std::cout << ((w[7]  & (1<<2))!=0) << " (bit 18) Coordinate Definition # bit 2\n";
+          std::cout << ((w[7]  & (1<<1))!=0) << " (bit 17) Coordinate Definition # bit 1\n";
+          std::cout << ((w[7]  & (1<<0))!=0) << " (bit 16) Coordinate Definition # bit 0\n";
+                               
+          std::cout << ((w[8]  & (1<<3))!=0) << " (bit 15) Assigned to C.S\n";
+          std::cout << ((w[8]  & (1<<2))!=0) << " (bit 14) (Reserved for future use)\n";
+          std::cout << ((w[8]  & (1<<1))!=0) << " (bit 13) Foreground In-Position\n";
+          std::cout << ((w[8]  & (1<<0))!=0) << " (bit 12) Stopped on Desired Position Limit\n";
+                               
+          std::cout << ((w[9]  & (1<<3))!=0) << " (bit 11) Stopped on Position Limit\n";
+          std::cout << ((w[9]  & (1<<2))!=0) << " (bit 10) Home Complete\n";
+          std::cout << ((w[9]  & (1<<1))!=0) << " (bit 09) Phasing Search/Read Active\n";
+          std::cout << ((w[9]  & (1<<0))!=0) << " (bit 08) Phasing Reference Error\n";
+
+          std::cout << ((w[10] & (1<<3))!=0) << " (bit 07) Trigger Move\n";
+          std::cout << ((w[10] & (1<<2))!=0) << " (bit 06) Integrated Fatal Following Error\n";
+          std::cout << ((w[10] & (1<<1))!=0) << " (bit 05) I2T Amplifier Fault Error\n";
+          std::cout << ((w[10] & (1<<0))!=0) << " (bit 04) Backlash Direction Flag\n";
+
+          std::cout << ((w[11] & (1<<3))!=0) << " (bit 03) Amplifier Fault Error\n";
+          std::cout << ((w[11] & (1<<2))!=0) << " (bit 02) Fatal Following Error\n";
+          std::cout << ((w[11] & (1<<1))!=0) << " (bit 01) Warning Following Error\n";
+          std::cout << ((w[11] & (1<<0))!=0) << " (bit 00) In Position\n";
+
+        } else {
+          std::cerr << "ERROR: return of ? not expected size: " << mstatus.size() << std::endl;
+        } 
       }
     } else {
       // Check if socket at least defined
@@ -1010,7 +1089,13 @@ std::string PMAC2Turbo::GetResponseString (std::string const& Line)
   }
 
 
-  return std::string(ret);
+  std::string retstr = std::string(ret);
+  char last = *retstr.rbegin();
+  if (last == '\n' || last == '\r' || last == ' ') {
+    retstr = retstr.substr(0, retstr.size() - 1);
+  }
+
+  return retstr;
 }
 
 
