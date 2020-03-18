@@ -5,7 +5,7 @@ This is a tool and terminal application for PMAC2 Turbo boards writted in c++ us
 There are tools to download, backup, restore, grab the gather buffer, and change IP addresses.  Usage is partially described below, per executable.
 
 ## To compile:
-make
+make install
 
 executables land in bin/
 
