@@ -7,7 +7,7 @@ There are tools to download, backup, restore, grab the gather buffer, and change
 ## To compile:
 make install
 
-executables land in bin/
+executables land in ~/bin/
 
 ## Executables
 
