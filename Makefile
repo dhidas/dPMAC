@@ -23,7 +23,7 @@ lib/%.o : exe/%.cc
 
 
 bin/% : $(OBJS) lib/%.o
-	$(LD) $(LIBS) $(OBJS) lib/$*.o -o bin/$*
+	$(LD) $(OBJS) lib/$*.o $(LIBS) -o bin/$*
 
 
 
