@@ -16,13 +16,13 @@
 #include <sstream>
 #include <exception>
 #include <string.h>
-//#include <sys/types.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 //#include <netinet/in.h>
 #include <arpa/inet.h>
 //#include <stdlib.h>
 #include <unistd.h>
-//#include <netdb.h>
+#include <netdb.h>
 //#include <cstdlib>
 #include <bitset>
 #include <iomanip>
@@ -99,28 +99,38 @@ void PMAC2Turbo::Connect (std::string const& IP, int const PORT)
   fIP = IP;
   fPORT = PORT;
 
+  struct addrinfo hints, *res;
+
+  std::string port = std::to_string(PORT);
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_family = PF_INET;
+
+  int err;
+  if ((err = getaddrinfo(IP.c_str(), port.c_str(), &hints, &res)) != 0)
+  {
+    std::cerr << "ERROR: Cannot create socket" << std::endl;
+    l() && fL << "ERROR: Cannot create socket" << std::endl;
+    return;
+  }
+
   // Create and connect the socket
-  fSocket = socket(PF_INET, SOCK_STREAM, 0);
+  fSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (fSocket < 0) {
     std::cerr << "ERROR: Cannot create socket" << std::endl;
     l() && fL << "ERROR: Cannot create socket" << std::endl;
   }
 
-  // Server socket address struct
-  struct sockaddr_in server_addr;
-
-  // Set server IP and port information
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = inet_addr(IP.c_str());
-  server_addr.sin_port = htons(PORT);
-
   // Connect socket or return an error
-  if (connect(fSocket,(struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
+  if (connect(fSocket, res->ai_addr, res->ai_addrlen) == 0) {
   } else {
     std::cerr << "Error when connecting to server " << IP << " on port " << PORT << std::endl;
     l() && fL << "Error when connecting to server " << IP << " on port " << PORT << std::endl;
     return;
   }
+
+  freeaddrinfo(res);
 
   // To establish correct communication protocol
   this->SendLine("I3=2");
@@ -585,49 +595,49 @@ void PMAC2Turbo::Terminal ()
           std::cout << ((w[0]  & (1<<2))!=0) << " (bit 22) Negative End Limit Set\n";
           std::cout << ((w[0]  & (1<<1))!=0) << " (bit 21) Positive End Limit Set\n";
           std::cout << ((w[0]  & (1<<0))!=0) << " (bit 20) Extended Servo Algorithm Enabled\n";
-                               
+
           std::cout << ((w[1]  & (1<<3))!=0) << " (bit 19) Amplifier Enabled\n";
           std::cout << ((w[1]  & (1<<2))!=0) << " (bit 18) Open Loop Mode\n";
           std::cout << ((w[1]  & (1<<1))!=0) << " (bit 17) Move Timer Active\n";
           std::cout << ((w[1]  & (1<<0))!=0) << " (bit 16) Integration Mode\n";
-                               
+
           std::cout << ((w[2]  & (1<<3))!=0) << " (bit 15) Dwell in Progress\n";
           std::cout << ((w[2]  & (1<<2))!=0) << " (bit 14) Data Block Error\n";
           std::cout << ((w[2]  & (1<<1))!=0) << " (bit 13) Desired Velocity Zero\n";
           std::cout << ((w[2]  & (1<<0))!=0) << " (bit 12) Abort Deceleration\n";
-                               
+
           std::cout << ((w[3]  & (1<<3))!=0) << " (bit 11) Block Request\n";
           std::cout << ((w[3]  & (1<<2))!=0) << " (bit 10) Home Search in Progress\n";
           std::cout << ((w[3]  & (1<<1))!=0) << " (bit 09) User-Written Phase Enable\n";
           std::cout << ((w[3]  & (1<<0))!=0) << " (bit 08) User-Written Servo Enable\n";
-                               
+
           std::cout << ((w[4]  & (1<<3))!=0) << " (bit 07) Alternate Source/Destination\n";
           std::cout << ((w[4]  & (1<<2))!=0) << " (bit 06) Phased Motor\n";
           std::cout << ((w[4]  & (1<<1))!=0) << " (bit 05) Following Offset Mode\n";
           std::cout << ((w[4]  & (1<<0))!=0) << " (bit 04) Following Enabled\n";
-                               
+
           std::cout << ((w[5]  & (1<<3))!=0) << " (bit 03) Error Trigger\n";
           std::cout << ((w[5]  & (1<<2))!=0) << " (bit 02) Software Position Capture\n";
           std::cout << ((w[5]  & (1<<1))!=0) << " (bit 01) Integrator in Velocity Loop\n";
           std::cout << ((w[5]  & (1<<0))!=0) << " (bit 00) Alternate Command-Output Mode\n";
-          
-          std::cout << "\n";          
-                               
+
+          std::cout << "\n";
+
           std::cout << ((w[6]  & (1<<3))!=0) << " (bit 23) (CS-1) # bit 3 (MSB)\n";
           std::cout << ((w[6]  & (1<<2))!=0) << " (bit 22) (CS-1) # bit 2\n";
           std::cout << ((w[6]  & (1<<1))!=0) << " (bit 21) (CS-1) # bit 1\n";
           std::cout << ((w[6]  & (1<<0))!=0) << " (bit 20) (CS-1) # bit 0\n";
-                               
+
           std::cout << ((w[7]  & (1<<3))!=0) << " (bit 19) Coordinate Definition # bit 3 (MSB)\n";
           std::cout << ((w[7]  & (1<<2))!=0) << " (bit 18) Coordinate Definition # bit 2\n";
           std::cout << ((w[7]  & (1<<1))!=0) << " (bit 17) Coordinate Definition # bit 1\n";
           std::cout << ((w[7]  & (1<<0))!=0) << " (bit 16) Coordinate Definition # bit 0\n";
-                               
+
           std::cout << ((w[8]  & (1<<3))!=0) << " (bit 15) Assigned to C.S\n";
           std::cout << ((w[8]  & (1<<2))!=0) << " (bit 14) (Reserved for future use)\n";
           std::cout << ((w[8]  & (1<<1))!=0) << " (bit 13) Foreground In-Position\n";
           std::cout << ((w[8]  & (1<<0))!=0) << " (bit 12) Stopped on Desired Position Limit\n";
-                               
+
           std::cout << ((w[9]  & (1<<3))!=0) << " (bit 11) Stopped on Position Limit\n";
           std::cout << ((w[9]  & (1<<2))!=0) << " (bit 10) Home Complete\n";
           std::cout << ((w[9]  & (1<<1))!=0) << " (bit 09) Phasing Search/Read Active\n";
@@ -645,7 +655,7 @@ void PMAC2Turbo::Terminal ()
 
         } else {
           std::cerr << "ERROR: return of ? not expected size: " << mstatus.size() << std::endl;
-        } 
+        }
       }
     } else {
       // Check if socket at least defined
@@ -716,7 +726,7 @@ void PMAC2Turbo::IPAddress (std::string const& IP)
     return;
   }
 
-  sscanf(IP.c_str(), "%hu.%hu.%hu.%hu", 
+  sscanf(IP.c_str(), "%hu.%hu.%hu.%hu",
       (unsigned short*) &fEthCmd.bData[0],
       (unsigned short*) &fEthCmd.bData[1],
       (unsigned short*) &fEthCmd.bData[2],
@@ -783,7 +793,7 @@ void PMAC2Turbo::SendCTRLK ()
 void PMAC2Turbo::SendLine (std::string const& Line)
 {
   // Send a command line to PMAC
-  
+
   // Check if socket at least defined
   if (!this->Check()) {
     return;
@@ -1058,7 +1068,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
 std::string PMAC2Turbo::GetResponseString (std::string const& Line)
 {
   // Send a command line to PMAC
- 
+
   if (!this->Flush()) {
     return "";
   }
