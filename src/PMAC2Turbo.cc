@@ -252,7 +252,7 @@ void PMAC2Turbo::Save ()
 
 
 
-#define NWORDS 15
+#define NWORDS 16
 const char *words[NWORDS] = {
 ".help ",
 ".quit ",
@@ -268,6 +268,7 @@ const char *words[NWORDS] = {
 ".cat ",
 ".ip ",
 ".watch ",
+".cleardefs",
 ".?"
 };
 
@@ -367,6 +368,7 @@ void PMAC2Turbo::Terminal ()
       std::cout << "  .cat      [file] [start] [stop]    - print file from line start to stop" << std::endl;
       std::cout << "  .ip       [addr]                   - get ip, or set if [addr] is given" << std::endl;
       std::cout << "  .watch    [cmds]                   - watch vars " << std::endl;
+      std::cout << "  .cleardefs                         - clear all #define in memory" << std::endl;
       std::cout << "  .?                                 - print motor status of current motor " << std::endl;
     } else if (bs == "$$$") {
       this->Reset();
@@ -582,6 +584,8 @@ void PMAC2Turbo::Terminal ()
       std::cout << myout << std::endl;
       sleep(1);
       }
+    } else if (bs.find(".cleardefs") == 0) {
+        this->ClearDefinePairs();
     } else if (bs.find(".?") == 0) {
       if (this->Check()) {
         std::string mstatus = this->GetResponseString("?");
