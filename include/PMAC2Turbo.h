@@ -24,6 +24,8 @@
 #define CTRLG '\7'
 #define CTRLK  0X0B
 #define CTRLM  0X0D
+#define CR     0X0D
+#define LF     0X0A
 #define CTRLP '\16'
 #define CTRLV '\22'
 #define CTRLX '\24'

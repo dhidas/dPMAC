@@ -1133,63 +1133,55 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
     return;
   }
 
-  // For the output commands
-  fEthCmd.RequestType = VR_UPLOAD;
-  fEthCmd.Request     = VR_PMAC_READREADY;
-  fEthCmd.wValue      = 0;
-  fEthCmd.wIndex      = 0;
-  fEthCmd.wLength     = htons(2);
 
-  send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
-  recv(fSocket, fData, 2, 0);
+  // Start with definitely reading
+  fData[0] = 1;
 
-  //int call = 0;
-  while (fData[0] == 1) {
+  bool alldone = false;
+  while (fData[0] != 0) {
 
     fEthCmd.RequestType = VR_UPLOAD;
     fEthCmd.Request     = VR_PMAC_GETBUFFER;
     fEthCmd.wValue      = 0;
     fEthCmd.wIndex      = 0;
-    fEthCmd.wLength     = 0;
+    fEthCmd.wLength     = htons(INPUT_SIZE);
     send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
     recv(fSocket, (char*) &fData, 1400, 0);
 
-    int cr_at = -1;
-    bool ack_found = false;
+    bool bell = false;
+
     for (int i = 0; i != 1400; ++i) {
-      if (fData[i] == ACK) {
-        ack_found = true;
-        cr_at = i;
-        break;
+      if (fData[i] == BELL || fData[i] == STX) {
+        bell = true;
+        continue;
       }
-      if (fData[i] == 0xD) {
-        cr_at = i;
-        if (i < 1400-1 && fData[i+1] == ACK) {
+      if (fData[i] == CR) {
+        cout && std::cout << "\n";
+        so   &&       *so << "\n";
+        fo   &&       *fo << "\n";
+        l() && fL << "\n";
+        if (bell) {
+          alldone = true;
+          break;
         }
+      }
+      if (fData[i] == ACK || fData[i] == LF) {
+        alldone = true;
         break;
       }
+      cout && std::cout << fData[i];
+      so   &&       *so << fData[i];
+      fo   &&       *fo << fData[i];
+      l()  &&        fL << fData[i];
     }
+    cout && std::cout << "\n";
+    so   &&       *so << "\n";
+    fo   &&       *fo << "\n";
+    l()  &&        fL << "\n";
 
-    if (cr_at < 0) {
-    } else {
-      for (int j = 0; j < cr_at; ++j) {
-        cout && std::cout << fData[j];
-        so   &&       *so << fData[j];
-        fo   &&       *fo << fData[j];
-        l() && fL << fData[j];
-      }
-      if (!ack_found) {
-        cout && std::cout << '\n';
-        so   &&       *so << '\n';
-        fo   &&       *fo << '\n';
-        l() && fL << '\n';
-      }
-
-    }
-    if (ack_found) {
+    if (alldone) {
       break;
     }
-
     fEthCmd.RequestType = VR_UPLOAD;
     fEthCmd.Request     = VR_PMAC_READREADY;
     fEthCmd.wValue      = 0;
