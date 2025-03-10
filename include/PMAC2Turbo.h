@@ -14,6 +14,7 @@
 
 #define MAX_BUFFER_SIZE 2097152
 #define INPUT_SIZE        (ETHERNET_DATA_SIZE+1)  /* +1 to allow space to add terminating ACK */
+#define READ_SIZE 1400
 #define STX   '\2'
 #define CTRLB '\2'
 #define CTRLC '\3'
@@ -94,6 +95,7 @@ class PMAC2Turbo
     void Save ();
     void Terminal ();
 
+    bool WaitReady (float const toms=1000, float const ppms=50);
     bool Flush ();
     void IPAddress (std::string const& IP = "");
     void SendCTRLK ();
@@ -101,7 +103,7 @@ class PMAC2Turbo
     int  DownloadFile (std::string const& InFileName);
     void WriteBuffer (std::string const& Buffer);
     std::string GetResponseString (std::string const& Line);
-    void GetBuffer (std::string const& OutFileName = "", std::ostream* so = 0x0, bool const cout = true);
+    void GetResponse (std::string const& Line, std::string const& OutFileName = "", std::ostream* so = 0x0, bool const cout = true);
     void ListGather (std::string const& OutFileName = "");
     void VariableDump (std::string const& V, std::string const& OutFileName, std::ostream* os, int const First = 0, int const Last = 8191);
     void MVariableDefinitionDump (std::string const& OutFileName = "", std::ostream* os = 0x0, int const First = 0, int const Last = 8191);
@@ -121,7 +123,7 @@ class PMAC2Turbo
 
     int fSocket;
     ETHERNETCMD fEthCmd;
-    unsigned char fData[1401];
+    unsigned char fData[READ_SIZE];
     std::string fDataSend;
 
     std::vector<bool> fDefineStatus;

@@ -241,8 +241,7 @@ void PMAC2Turbo::Save ()
 
   std::cout << "saving" << std::endl;
   l() && fL << "saving" << std::endl;
-  this->SendLine("save");
-  this->GetBuffer();
+  this->GetResponse("save");
   sleep(4);
   this->Flush();
 
@@ -571,18 +570,17 @@ void PMAC2Turbo::Terminal ()
       std::ostringstream oss;
 
       while (true) {
-      oss.str("");
-      this->SendLine(watchline);
-      this->GetBuffer("", &oss, false);
-      std::string myout = oss.str();
+        oss.str("");
+        this->GetResponse(watchline, "", &oss, false);
+        std::string myout = oss.str();
 
-      size_t bsn = myout.find('\n');
-      while (bsn != std::string::npos) {
-        myout.replace(bsn, 1, "   ");
-        bsn = myout.find('\n');
-      }
-      std::cout << myout << std::endl;
-      sleep(1);
+        size_t bsn = myout.find('\n');
+        while (bsn != std::string::npos) {
+          myout.replace(bsn, 1, "   ");
+          bsn = myout.find('\n');
+        }
+        std::cout << myout << std::endl;
+        sleep(1);
       }
     } else if (bs.find(".cleardefs") == 0) {
         this->ClearDefinePairs();
@@ -664,8 +662,8 @@ void PMAC2Turbo::Terminal ()
     } else {
       // Check if socket at least defined
       if (this->Check()) {
-        this->SendLine(buf);
-        this->GetBuffer();
+        this->Flush();
+        this->GetResponse(buf);
       }
     }
 
@@ -689,7 +687,29 @@ void PMAC2Turbo::Terminal ()
 }
 
 
+bool PMAC2Turbo::WaitReady (float const toms, float const ppms)
+{
 
+  int const np = int(toms/ppms) + 1;
+
+  // For the output commands
+  fEthCmd.RequestType = VR_UPLOAD;
+  fEthCmd.Request     = VR_PMAC_READREADY;
+  fEthCmd.wValue      = 0;
+  fEthCmd.wIndex      = 0;
+  fEthCmd.wLength     = htons(2);
+
+  for (int i = 0; i != np; ++i) {
+    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+    recv(fSocket, fData, 2, 0);
+    if (fData[0] != 0) {
+      return true;
+    }
+    usleep(ppms*1000);
+  }
+  std::cerr << "PMAC2Turbo::WaitReady failed to see ready" << std::endl;
+  return false;
+}
 
 
 bool PMAC2Turbo::Flush ()
@@ -709,7 +729,7 @@ bool PMAC2Turbo::Flush ()
   fEthCmd.wLength     = 0;
   send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
   recv(fSocket, (char*) &fData, 1, 0);
-  if (fData[0] != VR_DOWNLOAD) {
+  if (fData[0] != VR_DOWNLOAD && fData[0] != VR_PMAC_FLUSH) {
     std::cerr << "ERROR: flush failed" << std::endl;
     return false;
   }
@@ -803,6 +823,8 @@ void PMAC2Turbo::SendLine (std::string const& Line)
     return;
   }
 
+  this->Flush();
+  usleep(50000);
   fEthCmd.RequestType = VR_DOWNLOAD;
   fEthCmd.Request     = VR_PMAC_SENDLINE;
   fEthCmd.wValue      = 0;
@@ -812,6 +834,7 @@ void PMAC2Turbo::SendLine (std::string const& Line)
   send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE + Line.size(), 0);
   recv(fSocket, (char*) &fData, 1, 0);
 
+  usleep(50000);
   return;
 }
 
@@ -1113,7 +1136,7 @@ std::string PMAC2Turbo::GetResponseString (std::string const& Line)
 
 
 
-void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bool const cout)
+void PMAC2Turbo::GetResponse (std::string const& Line, std::string const& OutFileName, std::ostream* so, bool const cout)
 {
   // File for writing if name given
   if (so != 0x0 && !so->good()) {
@@ -1134,61 +1157,57 @@ void PMAC2Turbo::GetBuffer (std::string const& OutFileName, std::ostream* so, bo
   }
 
 
-  // Start with definitely reading
-  fData[0] = 1;
+  fEthCmd.RequestType = VR_DOWNLOAD;
+  fEthCmd.Request = VR_PMAC_GETRESPONSE;
+  fEthCmd.wValue = 0;
+  fEthCmd.wIndex = 0;
+  fEthCmd.wLength = htons(Line.size());
+  strncpy((char *)&fEthCmd.bData[0], Line.c_str(), Line.size());
+  send(fSocket,(char*)&fEthCmd,ETHERNETCMDSIZE + Line.size(), 0);
+  usleep(200000);
+  recv(fSocket, &fData,READ_SIZE,0);
 
-  bool alldone = false;
-  while (fData[0] != 0) {
+  bool first = true;
+  bool done = false;
+  bool bell = false;
+  while (!done) {
 
-    fEthCmd.RequestType = VR_UPLOAD;
-    fEthCmd.Request     = VR_PMAC_GETBUFFER;
-    fEthCmd.wValue      = 0;
-    fEthCmd.wIndex      = 0;
-    fEthCmd.wLength     = htons(INPUT_SIZE);
-    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
-    recv(fSocket, (char*) &fData, 1400, 0);
-
-    bool bell = false;
-
-    for (int i = 0; i != 1400; ++i) {
+    for (int i = 0; i != READ_SIZE; ++i) {
       if (fData[i] == BELL || fData[i] == STX) {
         bell = true;
         continue;
       }
-      if (fData[i] == CR) {
-        cout && std::cout << "\n";
-        so   &&       *so << "\n";
-        fo   &&       *fo << "\n";
-        l() && fL << "\n";
-        if (bell) {
-          alldone = true;
-          break;
-        }
+      if (fData[i] == CR && bell) {
+        done = true;
       }
       if (fData[i] == ACK || fData[i] == LF) {
-        alldone = true;
-        break;
+        done = true;
       }
-      cout && std::cout << fData[i];
-      so   &&       *so << fData[i];
-      fo   &&       *fo << fData[i];
-      l()  &&        fL << fData[i];
+      if (done) {
+        break;
+      } else {
+        if (fData[i] == CR) {
+          fData[i] = '\n';
+        }
+        cout && std::cout << fData[i];
+        so   &&       *so << fData[i];
+        fo   &&       *fo << fData[i];
+        l()  &&        fL << fData[i];
+      }
     }
-    cout && std::cout << "\n";
-    so   &&       *so << "\n";
-    fo   &&       *fo << "\n";
-    l()  &&        fL << "\n";
 
-    if (alldone) {
-      break;
+    if (!done) {
+      if (!this->WaitReady()) {
+        return;
+      }
+      fEthCmd.RequestType = VR_UPLOAD;
+      fEthCmd.Request     = VR_PMAC_GETBUFFER;
+      fEthCmd.wValue      = 0;
+      fEthCmd.wIndex      = 0;
+      fEthCmd.wLength     = htons(READ_SIZE);
+      send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
+      recv(fSocket, (char*) &fData, READ_SIZE, 0);
     }
-    fEthCmd.RequestType = VR_UPLOAD;
-    fEthCmd.Request     = VR_PMAC_READREADY;
-    fEthCmd.wValue      = 0;
-    fEthCmd.wIndex      = 0;
-    fEthCmd.wLength     = htons(2);
-    send(fSocket, (char*) &fEthCmd, ETHERNETCMDSIZE, 0);
-    recv(fSocket, fData, 2, 0);
   }
 
   if (fo) {
@@ -1218,8 +1237,7 @@ void PMAC2Turbo::ListGather (std::string const& OutFileName)
   // First flush any data in the buffer, send the list gather command,
   // Read the buffer, and flush after
   this->Flush();
-  this->SendLine("LIST GATHER");
-  this->GetBuffer(OutFileName);
+  this->GetResponse("LIST GATHER", OutFileName);
   this->Flush();
 
   return;
@@ -1267,8 +1285,7 @@ void PMAC2Turbo::VariableDump (std::string const& V, std::string const& OutFileN
 
   sprintf(command, "%s%i..%i", V.c_str(), First, Last);
 
-  this->SendLine(command);
-  this->GetBuffer("", &oss, false);
+  this->GetResponse(command, "", &oss, false);
   iss.str(oss.str());
   oss.str("");
   for (int i = First; i <= Last; ++i) {
@@ -1323,8 +1340,7 @@ void PMAC2Turbo::MVariableDefinitionDump (std::string const& OutFileName, std::o
 
   sprintf(command, "M%i..%i->", First, Last);
 
-  this->SendLine(command);
-  this->GetBuffer("", &oss, false);
+  this->GetResponse(command, "", &oss, false);
   iss.str(oss.str());
   oss.str("");
   for (int i = First; i <= Last; ++i) {
@@ -1378,8 +1394,7 @@ void PMAC2Turbo::PLCDump (std::string const& OutFileName, std::ostream* os, int 
   for (int i = First; i <= Last; ++i) {
     sprintf(command, "LIST PLC %i", i);
 
-    this->SendLine(command);
-    this->GetBuffer("", &oss, false);
+    this->GetResponse(command, "", &oss, false);
     std::string mystr = oss.str();
     oss.str("");
     if (mystr.size() > 0) {
@@ -1506,15 +1521,12 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
 
     for (int im = 1; im <= 32; ++im) {
       sprintf(command, "#%i->", im);
-      this->SendLine(command);
-
-      this->GetBuffer("", &oss, false);
+      this->GetResponse(command, "", &oss, false);
       fo << "#" << im << "->" << oss.str();
       oss.str("");
     }
 
-    this->SendLine("list forward");
-    this->GetBuffer("", &oss, false);
+    this->GetResponse("list forward", "", &oss, false);
     mystr = oss.str();
     oss.str("");
     pos_ret = mystr.find("RET");
@@ -1523,8 +1535,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
       fo << "OPEN FORWARD CLEAR\n" << mystr << std::endl;
     }
 
-    this->SendLine("list inverse");
-    this->GetBuffer("", &oss, false);
+    this->GetResponse("list inverse", "", &oss, false);
     mystr = oss.str();
     oss.str("");
     pos_ret = mystr.find("RET");
@@ -1548,8 +1559,7 @@ void PMAC2Turbo::MakeBackup (std::string const& OutFileName)
   for (int i = 0; i <= 32; ++i) {
     sprintf(command, "LIST PROG %i", i);
 
-    this->SendLine(command);
-    this->GetBuffer("", &oss, false);
+    this->GetResponse(command, "", &oss, false);
     std::string mystr = oss.str();
     oss.str("");
     if (mystr.size() > 0) {
