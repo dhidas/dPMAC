@@ -986,15 +986,7 @@ int PMAC2Turbo::DownloadFile (std::string const& InFileName)
         }
         Line = "";
       }
-    } else if (!InIfIgnore && else_pos != std::string::npos) {
-      size_t const nstatus = fDefineStatus.size();
-      if (nstatus == 0) {
-        std::cerr << "ERROR: Syntaxt. #else detected before if" << std::endl;
-        return 1;
-      }
-      fDefineStatus[nstatus-1] = !fDefineStatus[nstatus-1];
-      Line = "";
-    } else if (InIfIgnore && else_pos != std::string::npos) {
+    } else if (else_pos != std::string::npos) {
       size_t const nstatus = fDefineStatus.size();
       if (nstatus == 0) {
         std::cerr << "ERROR: Syntaxt. #else detected before if" << std::endl;
